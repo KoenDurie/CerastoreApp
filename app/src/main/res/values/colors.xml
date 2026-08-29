@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="charcoal">#FF121212</color>
+    <color name="charcoal_deep">#FF0B0B0B</color>
+    <color name="amber">#FFFFB300</color>
+    <color name="ic_launcher_background">#FF1A1408</color>
+</resources>
