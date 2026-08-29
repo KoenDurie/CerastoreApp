@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import be.kdr.agvalarm.data.AppSettings
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
 import be.kdr.agvalarm.model.ConnectionUiState
@@ -110,6 +111,17 @@ fun HomeScreen(
             item {
                 ConnectionBadge(connection)
             }
+            if (connection.broker is BrokerTarget.Home &&
+                connection.status != ConnectionStatus.CONNECTED
+            ) {
+                item {
+                    Text(
+                        text = AppSettings.HOME_LOCALHOST_HINT,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = AlarmRed,
+                    )
+                }
+            }
             item {
                 NetworkRow(label = network.transportLabel)
             }
@@ -129,7 +141,7 @@ fun HomeScreen(
             }
             if (events.isEmpty()) {
                 item {
-                    EmptyTraffic(connected = connection.status == ConnectionStatus.CONNECTED)
+                    EmptyTraffic(connection)
                 }
             } else {
                 items(events, key = { it.id }) { event ->
@@ -235,16 +247,19 @@ private fun NotificationsToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun EmptyTraffic(connected: Boolean) {
-    val text = if (connected) {
-        "Verbonden. Nog geen MQTT-berichten. Alarmen zitten nog niet op de broker."
-    } else {
-        "Nog geen MQTT-berichten. Wachten op verbinding met de broker."
+private fun EmptyTraffic(connection: ConnectionUiState) {
+    val homeOffline = connection.broker is BrokerTarget.Home &&
+        connection.status != ConnectionStatus.CONNECTED
+    val text = when {
+        homeOffline -> AppSettings.HOME_LOCALHOST_HINT
+        connection.status == ConnectionStatus.CONNECTED ->
+            "Verbonden. Nog geen MQTT-berichten. Geabonneerd op inventory/# en quality/status. AGV-alarmen zitten nog niet op MQTT (die komen via SNMP/SQL)."
+        else -> "Nog geen MQTT-berichten. Wachten op verbinding met de broker."
     }
     Text(
         text = text,
         style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = if (homeOffline) AlarmRed else MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 12.dp),
     )
 }

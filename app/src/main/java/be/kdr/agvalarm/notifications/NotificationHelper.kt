@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import be.kdr.agvalarm.MainActivity
 import be.kdr.agvalarm.R
+import be.kdr.agvalarm.mqtt.AlarmClassifier
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
 import be.kdr.agvalarm.model.ConnectionUiState
@@ -46,7 +47,7 @@ class NotificationHelper(context: Context) {
     }
 
     fun notifyAlarm(event: MqttEvent) {
-        val title = event.agvId?.takeIf { it.isNotBlank() } ?: "AGV storing"
+        val title = AlarmClassifier.notificationTitle(event.topic, event.payload)
         val body = event.payload.trim().ifEmpty { event.topic }.take(240)
         val tap = activityIntent(eventId = event.id, requestCode = (event.id % Int.MAX_VALUE).toInt())
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ALARM)

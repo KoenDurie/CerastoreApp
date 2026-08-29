@@ -38,6 +38,7 @@ data class ConnectionUiState(
 data class NetworkUiState(
     val transportLabel: String = "geen netwerk",
     val ssid: String? = null,
+    val vpnActive: Boolean = false,
 )
 
 data class MqttEvent(

@@ -5,6 +5,7 @@ import android.provider.Settings
 import android.util.Log
 import be.kdr.agvalarm.data.AppSettings
 import be.kdr.agvalarm.data.SettingsRepository
+import be.kdr.agvalarm.data.TopicSubscriptions
 import be.kdr.agvalarm.model.BrokerReachability
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
@@ -61,7 +62,7 @@ class MqttManager(
     private val deduplicator = AlarmDeduplicator()
     private val rescan = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private val clientId = buildClientId()
-    @Volatile private var lastSubscribeFilter: String? = null
+    @Volatile private var lastSubscribeKey: String? = null
     @Volatile private var lastAuthUser: String? = null
 
     private val _connection = MutableStateFlow(ConnectionUiState())
@@ -148,7 +149,11 @@ class MqttManager(
     private suspend fun applySelection() {
         val settings = settingsRepository.current()
         _network.value = networkMonitor.currentNetwork()
-        val target = brokerSelector.select(settings, _network.value.ssid)
+        val target = brokerSelector.select(
+            settings,
+            _network.value.ssid,
+            vpnActive = _network.value.vpnActive,
+        )
         ensureConnected(target, settings)
     }
 
@@ -157,7 +162,7 @@ class MqttManager(
             val existing = clientRef.get()
             if (existing != null &&
                 _connection.value.broker == target &&
-                lastSubscribeFilter == settings.topicFilter &&
+                lastSubscribeKey == settings.subscriptionKey() &&
                 lastAuthUser == settings.username
             ) {
                 when (existing.state) {
@@ -180,7 +185,7 @@ class MqttManager(
 
             val gen = generation.incrementAndGet()
             disconnectLocked()
-            lastSubscribeFilter = settings.topicFilter
+            lastSubscribeKey = settings.subscriptionKey()
             lastAuthUser = settings.username
             _connection.value = ConnectionUiState(
                 status = ConnectionStatus.CONNECTING,
@@ -199,9 +204,9 @@ class MqttManager(
                         .password(settings.password.toByteArray(StandardCharsets.UTF_8))
                         .applySimpleAuth()
                 }
-                connect.send().get(8, TimeUnit.SECONDS)
+                connect.send().get(AppSettings.CONNECT_TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)
                 if (generation.get() != gen) return
-                lastSubscribeFilter = settings.topicFilter
+                lastSubscribeKey = settings.subscriptionKey()
                 lastAuthUser = settings.username
                 _connection.value = ConnectionUiState(
                     status = ConnectionStatus.CONNECTED,
@@ -226,6 +231,10 @@ class MqttManager(
             .identifier(clientId)
             .serverHost(target.host)
             .serverPort(target.port)
+            .transportConfig()
+            .mqttConnectTimeout(AppSettings.CONNECT_TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)
+            .socketConnectTimeout(AppSettings.CONNECT_TIMEOUT_SECONDS.toLong(), TimeUnit.SECONDS)
+            .applyTransportConfig()
             .automaticReconnect()
             .initialDelay(1, TimeUnit.SECONDS)
             .maxDelay(30, TimeUnit.SECONDS)
@@ -236,9 +245,9 @@ class MqttManager(
                     it.copy(status = ConnectionStatus.CONNECTED, broker = target, lastError = null)
                 }
                 scope.launch {
-                    val filter = settingsRepository.current().topicFilter
+                    val currentSettings = settingsRepository.current()
                     val current = clientRef.get() ?: return@launch
-                    runCatching { subscribe(current, filter) }
+                    runCatching { subscribe(current, currentSettings) }
                 }
             }
             .addDisconnectedListener { context ->
@@ -258,19 +267,22 @@ class MqttManager(
             .buildAsync()
     }
 
-    private fun subscribe(client: Mqtt3AsyncClient, topicFilter: String) {
-        val filter = topicFilter.ifBlank { AppSettings.DEFAULT_TOPIC_FILTER }
-        lastSubscribeFilter = filter
-        client.subscribeWith()
-            .topicFilter(filter)
-            .qos(MqttQos.AT_LEAST_ONCE)
-            .callback { publish -> onPublish(publish) }
-            .send()
-        Log.i(TAG, "Subscribed to $filter")
+    private fun subscribe(client: Mqtt3AsyncClient, settings: AppSettings) {
+        val filters = TopicSubscriptions.filters(settings.extraTopicFilter)
+        lastSubscribeKey = settings.subscriptionKey()
+        filters.forEach { filter ->
+            client.subscribeWith()
+                .topicFilter(filter)
+                .qos(MqttQos.AT_LEAST_ONCE)
+                .callback { publish -> onPublish(publish) }
+                .send()
+            Log.i(TAG, "Subscribed to $filter")
+        }
     }
 
     private fun onPublish(publish: Mqtt3Publish) {
         val topic = publish.topic.toString()
+        if (TopicSubscriptions.isCommandTopic(topic)) return
         val payload = publish.payloadAsBytes.toString(StandardCharsets.UTF_8)
         val isAlarm = AlarmClassifier.isAlarm(topic, payload)
         val event = MqttEvent(
@@ -309,8 +321,8 @@ class MqttManager(
             appContext.contentResolver,
             Settings.Secure.ANDROID_ID,
         ).orEmpty()
-        val suffix = androidId.takeLast(8).ifBlank { "dev" }
-        return "agv-alarm-$suffix"
+        val suffix = androidId.takeLast(6).ifBlank { "dev" }
+        return "KDR_Android_$suffix"
     }
 
     companion object {

@@ -107,4 +107,68 @@ class AlarmClassifierTest {
     fun missingAgvIdIsNull() {
         assertNull(AlarmClassifier.extractAgvId("factory/line/status", """{"state":"ok"}"""))
     }
+
+    @Test
+    fun qualityStatusRobotInErrorIsAlarm() {
+        assertTrue(
+            AlarmClassifier.isAlarm(
+                "quality/status",
+                """{"robotInError":true,"operationMode":"AUTO"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun qualityStatusErrorFieldIsAlarm() {
+        assertTrue(
+            AlarmClassifier.isAlarm(
+                "quality/status",
+                """{"error":"E-STOP","robotInError":false}""",
+            ),
+        )
+    }
+
+    @Test
+    fun qualityStatusHealthyIsNotAlarm() {
+        assertFalse(
+            AlarmClassifier.isAlarm(
+                "quality/status",
+                """{"error":"","robotInError":false,"robotActiveAlarmsSummaryDisplay":"","operationMode":"AUTO"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun qualityStatusAlarmSummaryIsAlarm() {
+        assertTrue(
+            AlarmClassifier.isAlarm(
+                "quality/status",
+                """{"robotInError":false,"robotActiveAlarmsSummaryDisplay":"SRVO-001"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun qualityStatusNotificationTitleIsRobot() {
+        assertEquals(
+            "Kwaliteitsrobot storing",
+            AlarmClassifier.notificationTitle("quality/status", """{"robotInError":true}"""),
+        )
+    }
+
+    @Test
+    fun inventoryJsonIsNotAlarm() {
+        assertFalse(
+            AlarmClassifier.isAlarm(
+                "inventory/SnijLijn",
+                """{"locationName":"SnijLijn","productName":"Board","color":"#fff","textColor":"#000"}""",
+            ),
+        )
+    }
+
+    @Test
+    fun commandTopicsAreNotAlarms() {
+        assertFalse(AlarmClassifier.isAlarm("quality/robot/cmd", """{"cmd":"start"}"""))
+        assertFalse(AlarmClassifier.isAlarm("quality/robot/ack", """{"ok":true}"""))
+    }
 }

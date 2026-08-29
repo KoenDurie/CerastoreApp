@@ -64,9 +64,10 @@ fun SettingsScreen(
     var homePort by rememberSaveable { mutableStateOf(persisted.homePort.toString()) }
     var username by rememberSaveable { mutableStateOf(persisted.username) }
     var password by rememberSaveable { mutableStateOf(persisted.password) }
-    var topicFilter by rememberSaveable { mutableStateOf(persisted.topicFilter) }
+    var extraTopicFilter by rememberSaveable { mutableStateOf(persisted.extraTopicFilter) }
     var stubbeSsid by rememberSaveable { mutableStateOf(persisted.stubbeSsid) }
     var stubbeWifiPassword by rememberSaveable { mutableStateOf(persisted.stubbeWifiPassword) }
+    var homeSsid by rememberSaveable { mutableStateOf(persisted.homeSsid) }
 
     LaunchedEffect(persisted) {
         stubbeHost = persisted.stubbeHost
@@ -75,9 +76,10 @@ fun SettingsScreen(
         homePort = persisted.homePort.toString()
         username = persisted.username
         password = persisted.password
-        topicFilter = persisted.topicFilter
+        extraTopicFilter = persisted.extraTopicFilter
         stubbeSsid = persisted.stubbeSsid
         stubbeWifiPassword = persisted.stubbeWifiPassword
+        homeSsid = persisted.homeSsid
     }
 
     fun currentSettings(): AppSettings = AppSettings(
@@ -87,9 +89,10 @@ fun SettingsScreen(
         homePort = homePort.toIntOrNull() ?: AppSettings.DEFAULT_MQTT_PORT,
         username = username,
         password = password,
-        topicFilter = topicFilter.ifBlank { AppSettings.DEFAULT_TOPIC_FILTER },
+        extraTopicFilter = extraTopicFilter.trim(),
         stubbeSsid = stubbeSsid,
         stubbeWifiPassword = stubbeWifiPassword,
+        homeSsid = homeSsid,
         notificationsEnabled = persisted.notificationsEnabled,
     )
 
@@ -129,10 +132,20 @@ fun SettingsScreen(
                 Field("Stubbe-poort", stubbePort, { stubbePort = it }, KeyboardType.Number)
             }
             item {
-                Field("Thuis-host (PC-KDR of LAN-IP)", homeHost, { homeHost = it })
+                Field("Thuis-host (LAN-IP van PC-KDR)", homeHost, { homeHost = it })
             }
             item {
                 Field("Thuis-poort", homePort, { homePort = it }, KeyboardType.Number)
+            }
+            item {
+                Field("Thuis Wi-Fi SSID", homeSsid, { homeSsid = it })
+            }
+            item {
+                Text(
+                    "Op $homeSsid wordt Stubbe (10.0.0.20) niet verwacht, tenzij er een VPN actief is.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             item {
                 Field("Gebruikersnaam (optioneel)", username, { username = it })
@@ -146,11 +159,11 @@ fun SettingsScreen(
                 )
             }
             item {
-                Field("Topicfilter", topicFilter, { topicFilter = it })
+                Field("Extra topicfilter (optioneel, bv. #)", extraTopicFilter, { extraTopicFilter = it })
             }
             item {
                 Text(
-                    "Als de topicfilter leeg blijft, gebruikt de app # om alle bestaande topics te tonen. Alarmtopics komen later.",
+                    "Standaard: inventory/# en quality/status (bestaande retained topics). Extra leeg laten, of # voor discovery. De app publiceert niets en negeert quality/robot/cmd en quality/robot/ack. AGV-IDs zitten niet op MQTT.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -172,7 +185,7 @@ fun SettingsScreen(
             }
             item {
                 Text(
-                    "Als de huidige SSID overeenkomt, verbindt de app met Stubbe en slaat de thuisbroker over. Android kan wifi niet stil zwijgend joinen; met SSID + wachtwoord mag de app die netwerk wel voorstellen wanneer je in de buurt bent.",
+                    "Als de huidige SSID overeenkomt, verbindt de app met Stubbe. Android kan wifi niet stilzwijgend joinen; met SSID + wachtwoord mag de app dat netwerk wel voorstellen wanneer je in de buurt bent. Stubbe-SSID is op dit toestel nog niet bekend.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -254,6 +267,13 @@ private fun ProbeCard(result: BrokerReachability) {
             Text("Testresultaat", style = MaterialTheme.typography.titleLarge)
             ReachLine("Stubbe", result.stubbeTarget, result.stubbeReachable)
             ReachLine("Thuis", result.homeTarget, result.homeReachable)
+            if (!result.homeReachable) {
+                Text(
+                    AppSettings.HOME_LOCALHOST_HINT,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }

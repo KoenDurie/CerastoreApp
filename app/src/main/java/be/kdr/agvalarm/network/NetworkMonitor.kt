@@ -86,17 +86,25 @@ class NetworkMonitor(context: Context) {
                 NetworkUiState(
                     transportLabel = ssid ?: "Wi-Fi",
                     ssid = ssid,
+                    vpnActive = vpnActive(),
                 )
             }
             caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ->
-                NetworkUiState(transportLabel = "mobiel")
+                NetworkUiState(transportLabel = "mobiel", vpnActive = vpnActive())
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ->
-                NetworkUiState(transportLabel = "ethernet")
-            else -> NetworkUiState(transportLabel = "ander netwerk")
+                NetworkUiState(transportLabel = "ethernet", vpnActive = vpnActive())
+            else -> NetworkUiState(transportLabel = "ander netwerk", vpnActive = vpnActive())
         }
     }
 
     fun currentSsid(): String? = currentNetwork().ssid
+
+    fun vpnActive(): Boolean {
+        return connectivityManager.allNetworks.any { network ->
+            val caps = connectivityManager.getNetworkCapabilities(network) ?: return@any false
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        }
+    }
 
     private fun currentSsid(caps: NetworkCapabilities): String? {
         val fromCaps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

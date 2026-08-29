@@ -1,5 +1,6 @@
 package be.kdr.agvalarm.mqtt
 
+import be.kdr.agvalarm.data.TopicSubscriptions
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -10,11 +11,10 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Classifies MQTT traffic as an AGV alarm using topic, JSON fields, and payload text.
- * Alarm topics do not exist yet; this is ready for when they appear on the broker.
+ * Classifies MQTT traffic as an alarm. AGV telemetry is SNMP/SQL, not MQTT;
+ * quality/status is the Fanuc quality-cell robot, not the AGV fleet.
  */
 object AlarmClassifier {
 
@@ -22,13 +22,18 @@ object AlarmClassifier {
 
     private val alarmKeywords = listOf("alarm", "error", "fault", "storing")
     private val errorStateValues = setOf("error", "fault", "alarm", "stopped", "storing")
-    private val jsonAlarmKeys = listOf("alarm", "error")
+    private val jsonAlarmKeys = listOf("alarm", "error", "robotInError")
     private val jsonStateKeys = listOf("severity", "state", "status")
     private val agvIdKeys = listOf("agv", "agvId", "agv_id", "vehicle", "vehicleId", "vehicle_id")
     private val agvSegment = Regex("""agv[-_]?\d+""", RegexOption.IGNORE_CASE)
 
     fun isAlarm(topic: String, payload: String): Boolean {
+        if (TopicSubscriptions.isCommandTopic(topic)) return false
+        if (topic.startsWith("inventory/", ignoreCase = true)) return false
         if (containsKeyword(topic)) return true
+        if (topic.equals("quality/status", ignoreCase = true)) {
+            return isQualityRobotAlarm(payload)
+        }
         val obj = parseObject(payload)
         if (obj != null) {
             if (isAlarmJsonObject(obj)) return true
@@ -38,7 +43,15 @@ object AlarmClassifier {
         return containsKeyword(payload)
     }
 
+    fun notificationTitle(topic: String, payload: String): String {
+        if (topic.equals("quality/status", ignoreCase = true)) {
+            return "Kwaliteitsrobot storing"
+        }
+        return extractAgvId(topic, payload)?.takeIf { it.isNotBlank() } ?: "AGV storing"
+    }
+
     fun extractAgvId(topic: String, payload: String): String? {
+        if (topic.equals("quality/status", ignoreCase = true)) return null
         parseObject(payload)?.let { obj ->
             for (key in agvIdKeys) {
                 val value = obj.stringValue(key)
@@ -53,6 +66,15 @@ object AlarmClassifier {
             }
         }
         return null
+    }
+
+    private fun isQualityRobotAlarm(payload: String): Boolean {
+        val obj = parseObject(payload) ?: return containsKeyword(payload)
+        if (isTruthyAlarmField(obj["robotInError"])) return true
+        if (isTruthyAlarmField(obj["error"])) return true
+        if (isTruthyAlarmField(obj["alarm"])) return true
+        val summary = obj.stringValue("robotActiveAlarmsSummaryDisplay")
+        return !summary.isNullOrBlank()
     }
 
     private fun isAlarmJsonObject(obj: JsonObject): Boolean {

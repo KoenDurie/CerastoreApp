@@ -36,9 +36,10 @@ class SettingsRepository(context: Context) {
             prefs[Keys.HOME_PORT] = next.homePort.coerceIn(1, 65535)
             prefs[Keys.USERNAME] = next.username
             prefs[Keys.PASSWORD] = next.password
-            prefs[Keys.TOPIC_FILTER] = next.topicFilter.ifBlank { AppSettings.DEFAULT_TOPIC_FILTER }
+            prefs[Keys.EXTRA_TOPIC_FILTER] = next.extraTopicFilter.trim()
             prefs[Keys.STUBBE_SSID] = next.stubbeSsid.trim()
             prefs[Keys.STUBBE_WIFI_PASSWORD] = next.stubbeWifiPassword
+            prefs[Keys.HOME_SSID] = next.homeSsid.trim()
             prefs[Keys.NOTIFICATIONS] = next.notificationsEnabled
         }
     }
@@ -50,15 +51,29 @@ class SettingsRepository(context: Context) {
     private fun Preferences.toAppSettings(): AppSettings = AppSettings(
         stubbeHost = this[Keys.STUBBE_HOST] ?: AppSettings.DEFAULT_STUBBE_HOST,
         stubbePort = this[Keys.STUBBE_PORT] ?: AppSettings.DEFAULT_MQTT_PORT,
-        homeHost = this[Keys.HOME_HOST] ?: AppSettings.DEFAULT_HOME_HOST,
+        homeHost = migratedHomeHost(this[Keys.HOME_HOST]),
         homePort = this[Keys.HOME_PORT] ?: AppSettings.DEFAULT_MQTT_PORT,
         username = this[Keys.USERNAME].orEmpty(),
         password = this[Keys.PASSWORD].orEmpty(),
-        topicFilter = this[Keys.TOPIC_FILTER] ?: AppSettings.DEFAULT_TOPIC_FILTER,
+        extraTopicFilter = migratedExtraFilter(this[Keys.EXTRA_TOPIC_FILTER], this[Keys.LEGACY_TOPIC_FILTER]),
         stubbeSsid = this[Keys.STUBBE_SSID].orEmpty(),
         stubbeWifiPassword = this[Keys.STUBBE_WIFI_PASSWORD].orEmpty(),
+        homeSsid = this[Keys.HOME_SSID] ?: AppSettings.DEFAULT_HOME_SSID,
         notificationsEnabled = this[Keys.NOTIFICATIONS] ?: true,
     )
+
+    private fun migratedHomeHost(stored: String?): String {
+        if (stored.isNullOrBlank() || stored.equals("PC-KDR", ignoreCase = true)) {
+            return AppSettings.DEFAULT_HOME_HOST
+        }
+        return stored
+    }
+
+    private fun migratedExtraFilter(extra: String?, legacy: String?): String {
+        if (extra != null) return extra
+        if (legacy.isNullOrBlank() || legacy == "#") return ""
+        return legacy
+    }
 
     private object Keys {
         val STUBBE_HOST = stringPreferencesKey("stubbe_host")
@@ -67,9 +82,11 @@ class SettingsRepository(context: Context) {
         val HOME_PORT = intPreferencesKey("home_port")
         val USERNAME = stringPreferencesKey("username")
         val PASSWORD = stringPreferencesKey("password")
-        val TOPIC_FILTER = stringPreferencesKey("topic_filter")
+        val EXTRA_TOPIC_FILTER = stringPreferencesKey("extra_topic_filter")
+        val LEGACY_TOPIC_FILTER = stringPreferencesKey("topic_filter")
         val STUBBE_SSID = stringPreferencesKey("stubbe_ssid")
         val STUBBE_WIFI_PASSWORD = stringPreferencesKey("stubbe_wifi_password")
+        val HOME_SSID = stringPreferencesKey("home_ssid")
         val NOTIFICATIONS = booleanPreferencesKey("notifications_enabled")
     }
 }
