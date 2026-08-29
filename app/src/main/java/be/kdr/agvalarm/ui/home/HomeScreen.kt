@@ -1,47 +1,27 @@
 package be.kdr.agvalarm.ui.home
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Wifi
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -49,300 +29,213 @@ import be.kdr.agvalarm.data.AppSettings
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
 import be.kdr.agvalarm.model.ConnectionUiState
-import be.kdr.agvalarm.model.MqttEvent
 import be.kdr.agvalarm.ui.HomeViewModel
-import be.kdr.agvalarm.ui.theme.AlarmRed
-import be.kdr.agvalarm.ui.theme.Amber
-import be.kdr.agvalarm.ui.theme.CharcoalElevated
-import be.kdr.agvalarm.ui.theme.ConnectedGreen
-import be.kdr.agvalarm.ui.theme.OfflineGray
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import be.kdr.agvalarm.ui.dashboard.CoralPill
+import be.kdr.agvalarm.ui.dashboard.GlassCard
+import be.kdr.agvalarm.ui.dashboard.KpiCell
+import be.kdr.agvalarm.ui.dashboard.LimeDot
+import be.kdr.agvalarm.ui.dashboard.MiniGauge
+import be.kdr.agvalarm.ui.dashboard.SegmentedBar
+import be.kdr.agvalarm.ui.events.EventRow
+import be.kdr.agvalarm.ui.theme.AccentOrange
+import be.kdr.agvalarm.ui.theme.Coral
+import be.kdr.agvalarm.ui.theme.Ink
+import be.kdr.agvalarm.ui.theme.LabelGrey
+import be.kdr.agvalarm.ui.theme.Lime
+import kotlinx.coroutines.delay
 
-private val TimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-private val Brussels: ZoneId = ZoneId.of("Europe/Brussels")
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    onOpenSettings: () -> Unit,
+    onOpenAlarms: () -> Unit,
 ) {
     val connection by viewModel.connection.collectAsStateWithLifecycle()
     val events by viewModel.events.collectAsStateWithLifecycle()
     val network by viewModel.network.collectAsStateWithLifecycle()
     val notifications by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
     val highlightId by viewModel.highlightedEventId.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(highlightId, events) {
-        val id = highlightId ?: return@LaunchedEffect
-        val index = events.indexOfFirst { it.id == id }
-        if (index >= 0) {
-            listState.animateScrollToItem(index)
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1_000)
+            now = System.currentTimeMillis()
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("AGV Alarm") },
-                actions = {
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Instellingen")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = Amber,
-                ),
+    val hasAlarm = events.any { it.isAlarm }
+    val (hero, heroColor) = when {
+        hasAlarm -> "STORING" to Coral
+        connection.status == ConnectionStatus.CONNECTED -> "VERBONDEN" to Ink
+        connection.status == ConnectionStatus.CONNECTING -> "VERBINDEN" to AccentOrange
+        else -> "OFFLINE" to LabelGrey
+    }
+    val filled = when {
+        hasAlarm -> 12
+        connection.status == ConnectionStatus.CONNECTED -> 12
+        connection.status == ConnectionStatus.CONNECTING -> 5
+        else -> 1
+    }
+    val brokerName = when (connection.broker) {
+        is BrokerTarget.Stubbe -> "Stubbe"
+        is BrokerTarget.Home -> "Thuis"
+        null -> "—"
+    }
+    val hostPort = connection.broker?.hostPort ?: "—"
+    val lastAge = events.firstOrNull()?.let { ageLabel(now - it.timestampMillis) } ?: "—"
+    val activeAgvs = events.filter { it.isAlarm && !it.agvId.isNullOrBlank() }
+        .distinctBy { it.agvId }
+    val homeOffline = connection.broker is BrokerTarget.Home &&
+        connection.status != ConnectionStatus.CONNECTED
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Text(
+                text = hero,
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = heroColor,
             )
-        },
-    ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                ConnectionBadge(connection)
+            Text(
+                text = "$brokerName  ·  $hostPort",
+                style = MaterialTheme.typography.bodyMedium,
+                color = LabelGrey,
+            )
+            if (hasAlarm) {
+                Spacer(Modifier.height(8.dp))
+                CoralPill("AGV storing")
             }
-            if (connection.broker is BrokerTarget.Home &&
-                connection.status != ConnectionStatus.CONNECTED
-            ) {
-                item {
+        }
+        item {
+            SegmentedBar(filled = filled)
+        }
+        item {
+            Row(Modifier.fillMaxWidth()) {
+                KpiCell(value = brokerName, label = "broker")
+                KpiCell(value = lastAge, label = "laatste bericht")
+                KpiCell(
+                    value = if (notifications) "Aan" else "Uit",
+                    label = "meldingen",
+                )
+            }
+        }
+        if (homeOffline) {
+            item {
+                GlassCard {
                     Text(
-                        text = AppSettings.HOME_UNREACHABLE_HINT,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = AlarmRed,
+                        AppSettings.HOME_UNREACHABLE_HINT,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Coral,
                     )
                 }
             }
-            item {
-                NetworkRow(label = network.transportLabel)
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                GlassCard(modifier = Modifier.weight(1f)) {
+                    Text("Verbinding", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (connection.status == ConnectionStatus.CONNECTED && !hasAlarm) {
+                            LimeDot()
+                            Spacer(Modifier.padding(4.dp))
+                        }
+                        Text(
+                            hero,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = heroColor,
+                        )
+                    }
+                    Text(network.transportLabel, style = MaterialTheme.typography.labelSmall)
+                    Text(hostPort, style = MaterialTheme.typography.bodyMedium)
+                }
+                GlassCard(modifier = Modifier.weight(1f), sage = true) {
+                    Text("Meldingen", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(0.8f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (notifications) "Aan" else "Uit",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.White,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = notifications,
+                            onCheckedChange = viewModel::setNotificationsEnabled,
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = Lime,
+                                checkedThumbColor = Color.White,
+                                uncheckedTrackColor = Color(0xFF5A624C),
+                            ),
+                        )
+                    }
+                    MiniGauge(
+                        progress = when (connection.status) {
+                            ConnectionStatus.CONNECTED -> 1f
+                            ConnectionStatus.CONNECTING -> 0.4f
+                            ConnectionStatus.OFFLINE -> 0.08f
+                        },
+                    )
+                }
             }
+        }
+        if (activeAgvs.isNotEmpty()) {
             item {
-                NotificationsToggle(
-                    enabled = notifications,
-                    onToggle = viewModel::setNotificationsEnabled,
-                )
+                GlassCard(onExpand = onOpenAlarms) {
+                    Text("Actieve AGV", style = MaterialTheme.typography.labelSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        activeAgvs.take(6).forEach { event ->
+                            CoralPill("AGV ${event.agvId}")
+                        }
+                    }
+                }
             }
-            item {
-                Text(
-                    text = "Live MQTT",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Amber,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            if (events.isEmpty()) {
-                item {
+        }
+        item {
+            GlassCard(onExpand = onOpenAlarms) {
+                Text("Laatste MQTT", style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(8.dp))
+                if (events.isEmpty()) {
                     EmptyTraffic(connection)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        events.take(5).forEach { event ->
+                            EventRow(
+                                event = event,
+                                highlighted = event.id == highlightId,
+                                compact = true,
+                            )
+                        }
+                    }
                 }
-            } else {
-                items(events, key = { it.id }) { event ->
-                    EventRow(event = event, highlighted = event.id == highlightId)
-                }
             }
-        }
-    }
-}
-
-@Composable
-private fun ConnectionBadge(state: ConnectionUiState) {
-    val (statusText, accent) = when (state.status) {
-        ConnectionStatus.CONNECTED -> "Verbonden" to ConnectedGreen
-        ConnectionStatus.CONNECTING -> "Verbinden…" to Amber
-        ConnectionStatus.OFFLINE -> "Offline" to OfflineGray
-    }
-    val brokerLine = state.broker?.let { broker ->
-        val name = when (broker) {
-            is BrokerTarget.Stubbe -> "Stubbe ${broker.host}"
-            is BrokerTarget.Home -> "Thuis ${broker.host}"
-        }
-        "$name · ${broker.hostPort}"
-    } ?: "geen broker geselecteerd"
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CharcoalElevated),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .background(accent),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = accent,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = brokerLine,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NetworkRow(label: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Icon(Icons.Outlined.Wifi, contentDescription = null, tint = Amber)
-        Text(
-            text = "Netwerk: $label",
-            style = MaterialTheme.typography.bodyLarge,
-        )
-    }
-}
-
-@Composable
-private fun NotificationsToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = CharcoalElevated),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Meldingen", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    text = if (enabled) "Aan — storingen komen als melding" else "Uit — alleen in de log",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(
-                checked = enabled,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedTrackColor = Amber.copy(alpha = 0.5f),
-                    checkedThumbColor = Amber,
-                ),
-            )
         }
     }
 }
 
 @Composable
 private fun EmptyTraffic(connection: ConnectionUiState) {
-    val homeOffline = connection.broker is BrokerTarget.Home &&
-        connection.status != ConnectionStatus.CONNECTED
     val text = when {
-        homeOffline -> AppSettings.HOME_UNREACHABLE_HINT
         connection.status == ConnectionStatus.CONNECTED ->
-            "Verbonden. Nog geen MQTT-berichten. Geabonneerd op inventory/#, quality/status en stubbe/agv/#. AGV-storingen komen via een sidecar op MQTT (niet via SQL in deze app)."
-        else -> "Nog geen MQTT-berichten. Wachten op verbinding met de broker."
+            "Nog geen MQTT-berichten. Geabonneerd op inventory/#, quality/status en stubbe/agv/#."
+        else -> "Wachten op verbinding met de broker."
     }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyLarge,
-        color = if (homeOffline) AlarmRed else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 12.dp),
-    )
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = LabelGrey)
 }
 
-@Composable
-private fun EventRow(event: MqttEvent, highlighted: Boolean) {
-    val targetBorder by animateColorAsState(
-        if (highlighted) Amber else Color.Transparent,
-        label = "highlight",
-    )
-    val container = when {
-        event.isAlarm -> Color(0xFF3A1C12)
-        event.isResolved -> Color(0xFF1B2A1C)
-        else -> CharcoalElevated
-    }
-    val time = TimeFmt.format(Instant.ofEpochMilli(event.timestampMillis).atZone(Brussels))
-    Card(
-        colors = CardDefaults.cardColors(containerColor = container),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (highlighted || event.isAlarm || event.isResolved) {
-                    Modifier.border(
-                        width = if (highlighted) 2.dp else 1.dp,
-                        color = when {
-                            highlighted -> targetBorder
-                            event.isAlarm -> AlarmRed.copy(alpha = 0.7f)
-                            else -> ConnectedGreen.copy(alpha = 0.5f)
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = time,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Amber,
-                    fontFamily = FontFamily.Monospace,
-                )
-                if (event.isAlarm) {
-                    Text(
-                        text = "STORING",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = AlarmRed,
-                        fontWeight = FontWeight.Bold,
-                    )
-                } else if (event.isResolved) {
-                    Text(
-                        text = "OPGELOST",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = ConnectedGreen,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                event.agvId?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = event.topic,
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = FontFamily.Monospace,
-            )
-            val preview = event.payload.replace('\n', ' ').take(180)
-            if (preview.isNotBlank()) {
-                Text(
-                    text = preview,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-        }
+private fun ageLabel(deltaMs: Long): String {
+    val s = (deltaMs / 1000).coerceAtLeast(0)
+    return when {
+        s < 5 -> "nu"
+        s < 60 -> "${s}s"
+        s < 3600 -> "${s / 60}m"
+        else -> "${s / 3600}u"
     }
 }
