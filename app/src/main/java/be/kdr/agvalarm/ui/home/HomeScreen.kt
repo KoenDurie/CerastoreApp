@@ -116,7 +116,7 @@ fun HomeScreen(
             ) {
                 item {
                     Text(
-                        text = AppSettings.HOME_LOCALHOST_HINT,
+                        text = AppSettings.HOME_UNREACHABLE_HINT,
                         style = MaterialTheme.typography.bodyLarge,
                         color = AlarmRed,
                     )
@@ -251,7 +251,7 @@ private fun EmptyTraffic(connection: ConnectionUiState) {
     val homeOffline = connection.broker is BrokerTarget.Home &&
         connection.status != ConnectionStatus.CONNECTED
     val text = when {
-        homeOffline -> AppSettings.HOME_LOCALHOST_HINT
+        homeOffline -> AppSettings.HOME_UNREACHABLE_HINT
         connection.status == ConnectionStatus.CONNECTED ->
             "Verbonden. Nog geen MQTT-berichten. Geabonneerd op inventory/# en quality/status. AGV-alarmen zitten nog niet op MQTT (die komen via SNMP/SQL)."
         else -> "Nog geen MQTT-berichten. Wachten op verbinding met de broker."

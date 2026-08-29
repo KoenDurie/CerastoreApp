@@ -269,7 +269,7 @@ private fun ProbeCard(result: BrokerReachability) {
             ReachLine("Thuis", result.homeTarget, result.homeReachable)
             if (!result.homeReachable) {
                 Text(
-                    AppSettings.HOME_LOCALHOST_HINT,
+                    AppSettings.HOME_UNREACHABLE_HINT,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )

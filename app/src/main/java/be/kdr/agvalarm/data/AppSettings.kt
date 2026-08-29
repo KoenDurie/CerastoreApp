@@ -22,8 +22,8 @@ data class AppSettings(
         const val DEFAULT_MQTT_PORT = 1883
         const val KEEP_ALIVE_SECONDS = 30
         const val CONNECT_TIMEOUT_SECONDS = 10
-        const val HOME_LOCALHOST_HINT =
-            "Mosquitto op PC-KDR luistert mogelijk alleen op localhost. Open listener 1883 op 0.0.0.0 en firewallpoort 1883."
+        const val HOME_UNREACHABLE_HINT =
+            "Thuisbroker niet bereikbaar (192.168.0.239:1883). Controleer of PC-KDR aan staat, of je op wifi telenet-7E9C4 zit, en of Mosquitto draait."
     }
 }
 

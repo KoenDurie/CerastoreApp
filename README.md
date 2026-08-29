@@ -16,7 +16,7 @@ Package: `be.kdr.agvalarm`
 
 Keepalive 30 s, clean session, QoS 1, connect-timeout 10 s, automatische reconnect met backoff. ClientId: `KDR_Android_<shortDeviceId>`.
 
-**Thuis-Mosquitto bindt nu alleen localhost** (`127.0.0.1:1883`). De telefoon kan pas verbinden na `listener 1883 0.0.0.0` in Mosquitto én een Windows-firewallregel voor poort 1883. De app blijft `192.168.0.239:1883` als thuisbroker gebruiken en toont een Nederlandse hint als die probe faalt.
+Thuis-Mosquitto luistert op `0.0.0.0:1883` (anoniem, Windows-firewallregel "Mosquitto MQTT 1883"). Als de thuisprobe toch faalt, toont de app een generieke hint (PC uit, verkeerde wifi, Mosquitto niet actief) — niet meer dat de listener alleen op localhost zou staan.
 
 ## Dual-broker (auto-switch)
 
@@ -54,7 +54,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ## Eerste gebruik
 
 1. Open **AGV Alarm**. De app vraagt om meldingen (Android 13+) en start een voorgronddienst.
-2. **Thuis:** host staat op `192.168.0.239`. Open Mosquitto op `0.0.0.0:1883` en firewallpoort 1883, anders blijft de probe falen.
+2. **Thuis:** host staat op `192.168.0.239`. Verbind met wifi `telenet-7E9C4`. Als de broker onbereikbaar is: PC-KDR aan, Mosquitto actief, juiste wifi.
 3. **Op Stubbe:** wifi + bereikbaar `10.0.0.20` → automatische switch.
 4. Live log toont inventory- en quality-berichten. AGV-storingen komen later via MQTT (nu SNMP/SQL).
 
