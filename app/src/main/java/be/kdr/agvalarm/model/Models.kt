@@ -47,7 +47,16 @@ data class MqttEvent(
     val topic: String,
     val payload: String,
     val isAlarm: Boolean,
+    val isResolved: Boolean = false,
     val agvId: String?,
+    val displayMessage: String? = null,
+)
+
+data class AgvAlarmPopup(
+    val vehicleId: String,
+    val title: String,
+    val message: String,
+    val eventId: Long,
 )
 
 data class BrokerReachability(

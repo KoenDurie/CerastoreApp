@@ -61,6 +61,10 @@ class SettingsViewModel(
             _probing.value = false
         }
     }
+
+    fun fireTestAgvAlarm() {
+        mqttManager.fireTestAgvAlarm()
+    }
 }
 
 class AppViewModelFactory(private val container: AppContainer) : ViewModelProvider.Factory {

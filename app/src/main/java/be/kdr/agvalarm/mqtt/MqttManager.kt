@@ -6,6 +6,7 @@ import android.util.Log
 import be.kdr.agvalarm.data.AppSettings
 import be.kdr.agvalarm.data.SettingsRepository
 import be.kdr.agvalarm.data.TopicSubscriptions
+import be.kdr.agvalarm.model.AgvAlarmPopup
 import be.kdr.agvalarm.model.BrokerReachability
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
@@ -30,9 +31,14 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -73,6 +79,14 @@ class MqttManager(
 
     private val _network = MutableStateFlow(NetworkUiState())
     val network: StateFlow<NetworkUiState> = _network.asStateFlow()
+
+    private val _popupQueue = MutableStateFlow<List<AgvAlarmPopup>>(emptyList())
+    val activePopup: StateFlow<AgvAlarmPopup?> = _popupQueue
+        .map { it.firstOrNull() }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
+    private val _permissionRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val permissionRequests: SharedFlow<Unit> = _permissionRequests.asSharedFlow()
 
     private val _highlightedEventId = MutableStateFlow<Long?>(null)
     val highlightedEventId: StateFlow<Long?> = _highlightedEventId.asStateFlow()
@@ -126,6 +140,33 @@ class MqttManager(
 
     fun clearHighlight() {
         _highlightedEventId.value = null
+    }
+
+    fun dismissPopup() {
+        _popupQueue.update { queue -> queue.drop(1) }
+    }
+
+    fun fireTestAgvAlarm() {
+        val topic = "stubbe/agv/99/alarm"
+        val payload =
+            """{"vehicleId":99,"alarm":true,"error":true,"state":"error","message":"Testmelding"}"""
+        val verdict = AlarmClassifier.evaluate(topic, payload)
+        val event = MqttEvent(
+            id = eventSeq.incrementAndGet(),
+            timestampMillis = System.currentTimeMillis(),
+            topic = topic,
+            payload = payload,
+            isAlarm = true,
+            isResolved = false,
+            agvId = "99",
+            displayMessage = "Testmelding",
+        )
+        _events.update { current -> (listOf(event) + current).take(MAX_EVENTS) }
+        if (!notificationHelper.hasNotificationPermission()) {
+            _permissionRequests.tryEmit(Unit)
+        }
+        notificationHelper.notifyAlarm(event, verdict)
+        enqueueAgvPopup(event, verdict)
     }
 
     suspend fun probeBothBrokers(): BrokerReachability {
@@ -284,26 +325,56 @@ class MqttManager(
         val topic = publish.topic.toString()
         if (TopicSubscriptions.isCommandTopic(topic)) return
         val payload = publish.payloadAsBytes.toString(StandardCharsets.UTF_8)
-        val isAlarm = AlarmClassifier.isAlarm(topic, payload)
+        handleMessage(topic, payload)
+    }
+
+    private fun handleMessage(topic: String, payload: String) {
+        val verdict = AlarmClassifier.evaluate(topic, payload)
         val event = MqttEvent(
             id = eventSeq.incrementAndGet(),
             timestampMillis = System.currentTimeMillis(),
             topic = topic,
             payload = payload,
-            isAlarm = isAlarm,
-            agvId = AlarmClassifier.extractAgvId(topic, payload),
+            isAlarm = verdict.isActiveAlarm,
+            isResolved = verdict.isResolved,
+            agvId = verdict.vehicleId ?: AlarmClassifier.extractAgvId(topic, payload),
+            displayMessage = verdict.message,
         )
         _events.update { current ->
             (listOf(event) + current).take(MAX_EVENTS)
         }
-        if (isAlarm) {
+        if (verdict.notify) {
             scope.launch {
                 val enabled = settingsRepository.current().notificationsEnabled
-                if (enabled && deduplicator.shouldNotify(topic, payload)) {
-                    notificationHelper.notifyAlarm(event)
+                if (!enabled) return@launch
+                if (!deduplicator.shouldNotify(topic, payload)) return@launch
+                if (!notificationHelper.hasNotificationPermission()) {
+                    _permissionRequests.tryEmit(Unit)
+                }
+                notificationHelper.notifyAlarm(event, verdict)
+                if (verdict.isAgv) {
+                    enqueueAgvPopup(event, verdict)
                 }
             }
         }
+    }
+
+    private fun enqueueAgvPopup(event: MqttEvent, verdict: AlarmVerdict) {
+        val id = verdict.vehicleId ?: event.agvId ?: "?"
+        val popup = AgvAlarmPopup(
+            vehicleId = id,
+            title = "AGV $id storing",
+            message = verdict.message?.takeIf { it.isNotBlank() } ?: "AGV $id in error.",
+            eventId = event.id,
+        )
+        _popupQueue.update { queue ->
+            if (queue.any { it.vehicleId == popup.vehicleId && it.message == popup.message }) {
+                queue
+            } else {
+                queue + popup
+            }
+        }
+        highlightEvent(event.id)
     }
 
     private fun disconnectClient() {

@@ -28,7 +28,7 @@ data class AppSettings(
 }
 
 object TopicSubscriptions {
-    val DEFAULT = listOf("inventory/#", "quality/status")
+    val DEFAULT = listOf("inventory/#", "quality/status", "stubbe/agv/#")
     private val COMMAND_TOPICS = setOf(
         "quality/robot/cmd",
         "quality/robot/ack",

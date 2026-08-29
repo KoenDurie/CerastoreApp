@@ -8,9 +8,9 @@ import org.junit.Test
 class TopicSubscriptionsTest {
 
     @Test
-    fun defaultFiltersAreInventoryAndQuality() {
+    fun defaultFiltersIncludeAgvAlarms() {
         assertEquals(
-            listOf("inventory/#", "quality/status"),
+            listOf("inventory/#", "quality/status", "stubbe/agv/#"),
             TopicSubscriptions.filters(""),
         )
     }
@@ -18,7 +18,7 @@ class TopicSubscriptionsTest {
     @Test
     fun extraHashAddsDiscoveryFilter() {
         assertEquals(
-            listOf("inventory/#", "quality/status", "#"),
+            listOf("inventory/#", "quality/status", "stubbe/agv/#", "#"),
             TopicSubscriptions.filters("#"),
         )
     }

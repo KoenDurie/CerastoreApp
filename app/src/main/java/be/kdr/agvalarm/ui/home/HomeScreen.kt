@@ -253,7 +253,7 @@ private fun EmptyTraffic(connection: ConnectionUiState) {
     val text = when {
         homeOffline -> AppSettings.HOME_UNREACHABLE_HINT
         connection.status == ConnectionStatus.CONNECTED ->
-            "Verbonden. Nog geen MQTT-berichten. Geabonneerd op inventory/# en quality/status. AGV-alarmen zitten nog niet op MQTT (die komen via SNMP/SQL)."
+            "Verbonden. Nog geen MQTT-berichten. Geabonneerd op inventory/#, quality/status en stubbe/agv/#. AGV-storingen komen via een sidecar op MQTT (niet via SQL in deze app)."
         else -> "Nog geen MQTT-berichten. Wachten op verbinding met de broker."
     }
     Text(
@@ -270,7 +270,11 @@ private fun EventRow(event: MqttEvent, highlighted: Boolean) {
         if (highlighted) Amber else Color.Transparent,
         label = "highlight",
     )
-    val container = if (event.isAlarm) Color(0xFF3A1C12) else CharcoalElevated
+    val container = when {
+        event.isAlarm -> Color(0xFF3A1C12)
+        event.isResolved -> Color(0xFF1B2A1C)
+        else -> CharcoalElevated
+    }
     val time = TimeFmt.format(Instant.ofEpochMilli(event.timestampMillis).atZone(Brussels))
     Card(
         colors = CardDefaults.cardColors(containerColor = container),
@@ -278,10 +282,14 @@ private fun EventRow(event: MqttEvent, highlighted: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (highlighted || event.isAlarm) {
+                if (highlighted || event.isAlarm || event.isResolved) {
                     Modifier.border(
                         width = if (highlighted) 2.dp else 1.dp,
-                        color = if (highlighted) targetBorder else AlarmRed.copy(alpha = 0.7f),
+                        color = when {
+                            highlighted -> targetBorder
+                            event.isAlarm -> AlarmRed.copy(alpha = 0.7f)
+                            else -> ConnectedGreen.copy(alpha = 0.5f)
+                        },
                         shape = RoundedCornerShape(10.dp),
                     )
                 } else {
@@ -302,6 +310,13 @@ private fun EventRow(event: MqttEvent, highlighted: Boolean) {
                         text = "STORING",
                         style = MaterialTheme.typography.labelLarge,
                         color = AlarmRed,
+                        fontWeight = FontWeight.Bold,
+                    )
+                } else if (event.isResolved) {
+                    Text(
+                        text = "OPGELOST",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ConnectedGreen,
                         fontWeight = FontWeight.Bold,
                     )
                 }

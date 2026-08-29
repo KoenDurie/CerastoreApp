@@ -9,9 +9,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import be.kdr.agvalarm.service.MqttForegroundService
 import be.kdr.agvalarm.ui.AgvAlarmRoot
 import be.kdr.agvalarm.ui.AppViewModelFactory
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -26,9 +30,17 @@ class MainActivity : ComponentActivity() {
         requestRuntimePermissions()
         startMqttService()
         handleHighlight(intent)
-        val factory = AppViewModelFactory((application as AgvAlarmApplication).container)
+        val app = application as AgvAlarmApplication
+        val factory = AppViewModelFactory(app.container)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                app.container.mqttManager.permissionRequests.collect {
+                    requestNotificationPermission()
+                }
+            }
+        }
         setContent {
-            AgvAlarmRoot(factory = factory)
+            AgvAlarmRoot(factory = factory, mqttManager = app.container.mqttManager)
         }
     }
 
@@ -62,6 +74,16 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
         }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
     }
 
     private fun startMqttService() {

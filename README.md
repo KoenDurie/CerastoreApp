@@ -3,7 +3,7 @@
 Android-app (Kotlin, Jetpack Compose, Material 3) voor **Koen Durie / KDR Engineering**.
 De app houdt een MQTT-verbinding open en moet Koen op zijn telefoon verwittigen wanneer een Stubbe-AGV (JBT, site Stubbe Zonnebeke) in storing gaat.
 
-AGV-telemetry zit **niet** op MQTT (dat is SNMP/SQL). Alarmtopics voor de AGV-vloot bestaan nog niet. Deze versie verbindt al, blijft op de achtergrond verbonden, toont live MQTT-verkeer (`inventory/#`, `quality/status`), en is klaar voor toekomstige AGV-alarmtopics.
+AGV-telemetry zit **niet** in deze app (geen SQL/JDBC). Een sidecar op PC-KDR publiceert retained MQTT op `stubbe/agv/{id}/alarm` wanneer een AGV in storing is. De app toont raw MQTT én een **popup + heads-up** bij `alarm:true`.
 
 Package: `be.kdr.agvalarm`
 
@@ -30,12 +30,17 @@ Thuis-Mosquitto luistert op `0.0.0.0:1883` (anoniem, Windows-firewallregel "Mosq
 
 Standaard subscribe (QoS 1), geen publish:
 
-- `inventory/#` — retained JSON `{locationName, productName, color, textColor}` (o.a. `inventory/SnijLijn`, `inventory/CONV1`, `inventory/401`)
-- `quality/status` — Fanuc **kwaliteitsrobot** (niet de AGV-vloot). Velden o.a. `error`, `robotInError`, `robotActiveAlarmsSummaryDisplay`, `operationMode`
+- `inventory/#` — retained JSON `{locationName, productName, color, textColor}`
+- `quality/status` — Fanuc **kwaliteitsrobot** (niet de AGV-vloot)
+- `stubbe/agv/#` — sidecar AGV-alarmen: `stubbe/agv/{vehicleId}/alarm`
 
-Niet abonneren als commander: `quality/robot/cmd` / `quality/robot/ack` (geen retain, geen publish). Extra topicfilter in Instellingen (leeg of `#` voor discovery).
+Niet abonneren als commander: `quality/robot/cmd` / `quality/robot/ack`. Extra topicfilter in Instellingen (leeg of `#` voor discovery).
 
-`quality/status` met `error` / `robotInError` / `alarm` geeft een melding **Kwaliteitsrobot storing**. Toekomstige AGV-alarmtopics blijven via dezelfde classifier werken.
+Actieve AGV-alarm JSON (retain, QoS 1): `{"vehicleId":7,"alarm":true,"error":true,"state":"error","message":"AGV 7 in error."}` → heads-up + dialog **AGV 7 storing**. Clear (`alarm:false`) geeft geen melding, wel “OPGELOST” in de log.
+
+`quality/status` met `error` / `robotInError` / `alarm` geeft **Kwaliteitsrobot storing** (geen AGV-dialog). Inventory never notifies.
+
+In Instellingen: **Test AGV-melding** (fake AGV 99 / Testmelding).
 
 ## Debug-APK bouwen
 
@@ -56,6 +61,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 1. Open **AGV Alarm**. De app vraagt om meldingen (Android 13+) en start een voorgronddienst.
 2. **Thuis:** host staat op `192.168.0.239`. Verbind met wifi `telenet-7E9C4`. Als de broker onbereikbaar is: PC-KDR aan, Mosquitto actief, juiste wifi.
 3. **Op Stubbe:** wifi + bereikbaar `10.0.0.20` → automatische switch.
-4. Live log toont inventory- en quality-berichten. AGV-storingen komen later via MQTT (nu SNMP/SQL).
+4. Live log toont inventory-, quality- en later sidecar-AGV-berichten. **Test AGV-melding** in Instellingen toont de popup. Echte AGV-storingen komen als retained `stubbe/agv/{id}/alarm` (geen SQL in de app).
 
 Geen SQL-credentials of andere geheimen in deze repo, alleen de LAN-hosts hierboven.

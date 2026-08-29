@@ -12,8 +12,31 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
 
+data class AlarmVerdict(
+    val notify: Boolean,
+    val isActiveAlarm: Boolean,
+    val isResolved: Boolean,
+    val isQualityRobot: Boolean,
+    val isAgv: Boolean,
+    val vehicleId: String?,
+    val message: String?,
+) {
+    companion object {
+        val None = AlarmVerdict(
+            notify = false,
+            isActiveAlarm = false,
+            isResolved = false,
+            isQualityRobot = false,
+            isAgv = false,
+            vehicleId = null,
+            message = null,
+        )
+    }
+}
+
 /**
- * Classifies MQTT traffic as an alarm. AGV telemetry is SNMP/SQL, not MQTT;
+ * Classifies MQTT traffic. AGV fleet alarms arrive as retained
+ * `stubbe/agv/{id}/alarm` from a PC-KDR sidecar (not SQL in the app).
  * quality/status is the Fanuc quality-cell robot, not the AGV fleet.
  */
 object AlarmClassifier {
@@ -24,34 +47,124 @@ object AlarmClassifier {
     private val errorStateValues = setOf("error", "fault", "alarm", "stopped", "storing")
     private val jsonAlarmKeys = listOf("alarm", "error", "robotInError")
     private val jsonStateKeys = listOf("severity", "state", "status")
-    private val agvIdKeys = listOf("agv", "agvId", "agv_id", "vehicle", "vehicleId", "vehicle_id")
+    private val agvIdKeys = listOf("vehicleId", "vehicle_id", "agv", "agvId", "agv_id", "vehicle")
     private val agvSegment = Regex("""agv[-_]?\d+""", RegexOption.IGNORE_CASE)
+    private val stubbeAgvAlarm = Regex("""^stubbe/agv/([^/]+)/alarm$""", RegexOption.IGNORE_CASE)
 
-    fun isAlarm(topic: String, payload: String): Boolean {
-        if (TopicSubscriptions.isCommandTopic(topic)) return false
-        if (topic.startsWith("inventory/", ignoreCase = true)) return false
-        if (containsKeyword(topic)) return true
-        if (topic.equals("quality/status", ignoreCase = true)) {
-            return isQualityRobotAlarm(payload)
-        }
+    fun evaluate(topic: String, payload: String): AlarmVerdict {
+        if (TopicSubscriptions.isCommandTopic(topic)) return AlarmVerdict.None
+        if (topic.startsWith("inventory/", ignoreCase = true)) return AlarmVerdict.None
+
         val obj = parseObject(payload)
-        if (obj != null) {
-            if (isAlarmJsonObject(obj)) return true
-            if (jsonTextContainsKeyword(obj)) return true
-            return false
+        val vehicleId = extractAgvId(topic, payload)
+        val message = obj.stringValue("message")
+
+        if (topic.equals("quality/status", ignoreCase = true)) {
+            val active = isQualityRobotAlarm(obj, payload)
+            return AlarmVerdict(
+                notify = active,
+                isActiveAlarm = active,
+                isResolved = false,
+                isQualityRobot = true,
+                isAgv = false,
+                vehicleId = null,
+                message = message,
+            )
         }
-        return containsKeyword(payload)
+
+        val stubbeMatch = stubbeAgvAlarm.matchEntire(topic)
+        if (stubbeMatch != null) {
+            val id = obj.stringValue("vehicleId") ?: stubbeMatch.groupValues[1]
+            val alarmOn = isTruthyAlarmField(obj?.get("alarm")) || isTruthyAlarmField(obj?.get("error"))
+            val explicitlyOff = obj != null &&
+                !isTruthyAlarmField(obj["alarm"]) &&
+                !isTruthyAlarmField(obj["error"]) &&
+                (obj.containsKey("alarm") || obj.containsKey("error"))
+            return if (alarmOn) {
+                AlarmVerdict(
+                    notify = true,
+                    isActiveAlarm = true,
+                    isResolved = false,
+                    isQualityRobot = false,
+                    isAgv = true,
+                    vehicleId = id,
+                    message = message ?: "AGV $id in error.",
+                )
+            } else if (explicitlyOff) {
+                AlarmVerdict(
+                    notify = false,
+                    isActiveAlarm = false,
+                    isResolved = true,
+                    isQualityRobot = false,
+                    isAgv = true,
+                    vehicleId = id,
+                    message = message,
+                )
+            } else {
+                AlarmVerdict(
+                    notify = true,
+                    isActiveAlarm = true,
+                    isResolved = false,
+                    isQualityRobot = false,
+                    isAgv = true,
+                    vehicleId = id,
+                    message = message ?: "AGV $id storing",
+                )
+            }
+        }
+
+        if (obj != null && (obj.containsKey("alarm") || obj.containsKey("error"))) {
+            val on = isTruthyAlarmField(obj["alarm"]) || isTruthyAlarmField(obj["error"])
+            if (!on) {
+                return AlarmVerdict.None.copy(vehicleId = vehicleId, message = message)
+            }
+            return AlarmVerdict(
+                notify = true,
+                isActiveAlarm = true,
+                isResolved = false,
+                isQualityRobot = false,
+                isAgv = vehicleId != null,
+                vehicleId = vehicleId,
+                message = message,
+            )
+        }
+
+        val generic = when {
+            containsKeyword(topic) -> true
+            obj != null && isAlarmJsonObject(obj) -> true
+            obj != null && jsonTextContainsKeyword(obj) -> true
+            obj == null && containsKeyword(payload) -> true
+            else -> false
+        }
+        return AlarmVerdict(
+            notify = generic,
+            isActiveAlarm = generic,
+            isResolved = false,
+            isQualityRobot = false,
+            isAgv = vehicleId != null,
+            vehicleId = vehicleId,
+            message = message,
+        )
     }
 
+    fun isAlarm(topic: String, payload: String): Boolean = evaluate(topic, payload).isActiveAlarm
+
+    fun shouldNotify(topic: String, payload: String): Boolean = evaluate(topic, payload).notify
+
     fun notificationTitle(topic: String, payload: String): String {
-        if (topic.equals("quality/status", ignoreCase = true)) {
-            return "Kwaliteitsrobot storing"
-        }
-        return extractAgvId(topic, payload)?.takeIf { it.isNotBlank() } ?: "AGV storing"
+        val verdict = evaluate(topic, payload)
+        if (verdict.isQualityRobot) return "Kwaliteitsrobot storing"
+        val id = verdict.vehicleId
+        if (verdict.isAgv && !id.isNullOrBlank()) return "AGV $id storing"
+        return id?.takeIf { it.isNotBlank() }?.let { "AGV $it storing" } ?: "AGV storing"
     }
 
     fun extractAgvId(topic: String, payload: String): String? {
         if (topic.equals("quality/status", ignoreCase = true)) return null
+        stubbeAgvAlarm.matchEntire(topic)?.let { match ->
+            parseObject(payload).stringValue("vehicleId")?.let { return it }
+            return match.groupValues[1]
+        }
         parseObject(payload)?.let { obj ->
             for (key in agvIdKeys) {
                 val value = obj.stringValue(key)
@@ -68,8 +181,14 @@ object AlarmClassifier {
         return null
     }
 
-    private fun isQualityRobotAlarm(payload: String): Boolean {
-        val obj = parseObject(payload) ?: return containsKeyword(payload)
+    fun notificationId(verdict: AlarmVerdict): Int {
+        if (verdict.isQualityRobot) return QUALITY_NOTIFICATION_ID
+        val n = verdict.vehicleId?.toIntOrNull()
+        return if (n != null) AGV_NOTIFICATION_BASE + n else AGV_NOTIFICATION_FALLBACK
+    }
+
+    private fun isQualityRobotAlarm(obj: JsonObject?, payload: String): Boolean {
+        if (obj == null) return containsKeyword(payload)
         if (isTruthyAlarmField(obj["robotInError"])) return true
         if (isTruthyAlarmField(obj["error"])) return true
         if (isTruthyAlarmField(obj["alarm"])) return true
@@ -140,12 +259,16 @@ object AlarmClassifier {
         }
     }
 
-    private fun JsonObject.stringValue(key: String): String? {
-        val element = this[key] ?: return null
+    private fun JsonObject?.stringValue(key: String): String? {
+        val element = this?.get(key) ?: return null
         if (element is JsonNull) return null
         if (element is JsonPrimitive) {
             return element.contentOrNull?.takeIf { it.isNotBlank() }
         }
         return null
     }
+
+    const val QUALITY_NOTIFICATION_ID = 1900
+    const val AGV_NOTIFICATION_BASE = 2000
+    const val AGV_NOTIFICATION_FALLBACK = 2998
 }

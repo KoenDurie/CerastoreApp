@@ -171,4 +171,52 @@ class AlarmClassifierTest {
         assertFalse(AlarmClassifier.isAlarm("quality/robot/cmd", """{"cmd":"start"}"""))
         assertFalse(AlarmClassifier.isAlarm("quality/robot/ack", """{"ok":true}"""))
     }
+
+    @Test
+    fun stubbeAgvAlarmTrueNotifies() {
+        val payload = """{"vehicleId":7,"alarm":true,"error":true,"state":"error","message":"AGV 7 in error."}"""
+        val verdict = AlarmClassifier.evaluate("stubbe/agv/7/alarm", payload)
+        assertTrue(verdict.notify)
+        assertTrue(verdict.isActiveAlarm)
+        assertFalse(verdict.isResolved)
+        assertTrue(verdict.isAgv)
+        assertEquals("7", verdict.vehicleId)
+        assertEquals("AGV 7 in error.", verdict.message)
+        assertEquals("AGV 7 storing", AlarmClassifier.notificationTitle("stubbe/agv/7/alarm", payload))
+        assertEquals(2007, AlarmClassifier.notificationId(verdict))
+    }
+
+    @Test
+    fun stubbeAgvAlarmFalseDoesNotNotify() {
+        val payload = """{"vehicleId":7,"alarm":false,"error":false,"state":"ok"}"""
+        val verdict = AlarmClassifier.evaluate("stubbe/agv/7/alarm", payload)
+        assertFalse(verdict.notify)
+        assertFalse(verdict.isActiveAlarm)
+        assertTrue(verdict.isResolved)
+        assertFalse(AlarmClassifier.shouldNotify("stubbe/agv/7/alarm", payload))
+    }
+
+    @Test
+    fun twoAgvsGetDistinctNotificationIds() {
+        val a = AlarmClassifier.evaluate(
+            "stubbe/agv/3/alarm",
+            """{"vehicleId":3,"alarm":true,"error":true,"state":"error"}""",
+        )
+        val b = AlarmClassifier.evaluate(
+            "stubbe/agv/8/alarm",
+            """{"vehicleId":8,"alarm":true,"error":true,"state":"error"}""",
+        )
+        assertTrue(AlarmClassifier.notificationId(a) != AlarmClassifier.notificationId(b))
+    }
+
+    @Test
+    fun qualityNotificationIdIsNotAgv() {
+        val quality = AlarmClassifier.evaluate("quality/status", """{"robotInError":true}""")
+        val agv = AlarmClassifier.evaluate(
+            "stubbe/agv/1/alarm",
+            """{"vehicleId":1,"alarm":true,"error":true,"state":"error"}""",
+        )
+        assertEquals(1900, AlarmClassifier.notificationId(quality))
+        assertTrue(AlarmClassifier.notificationId(quality) != AlarmClassifier.notificationId(agv))
+    }
 }

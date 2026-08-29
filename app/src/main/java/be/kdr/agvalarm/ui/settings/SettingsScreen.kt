@@ -163,7 +163,7 @@ fun SettingsScreen(
             }
             item {
                 Text(
-                    "Standaard: inventory/# en quality/status (bestaande retained topics). Extra leeg laten, of # voor discovery. De app publiceert niets en negeert quality/robot/cmd en quality/robot/ack. AGV-IDs zitten niet op MQTT.",
+                    "Standaard: inventory/#, quality/status en stubbe/agv/#. Extra leeg laten, of # voor discovery. De app publiceert niets en negeert quality/robot/cmd en quality/robot/ack. AGV-storingen komen als retained MQTT van een sidecar op PC-KDR (geen SQL in de app).",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -211,6 +211,28 @@ fun SettingsScreen(
                     }
                     Text("Testverbinding")
                 }
+            }
+            item {
+                Button(
+                    onClick = {
+                        viewModel.save(currentSettings())
+                        viewModel.fireTestAgvAlarm()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Amber,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) {
+                    Text("Test AGV-melding")
+                }
+            }
+            item {
+                Text(
+                    "Stuurt dezelfde heads-up en popup als een echte storing (AGV 99, Testmelding). Geen MQTT-publish.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             probe?.let { result ->
                 item { ProbeCard(result) }
