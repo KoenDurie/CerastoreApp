@@ -173,6 +173,15 @@ class AlarmClassifierTest {
     }
 
     @Test
+    fun orderTopicsAreNeverAlarms() {
+        val busy = """{"vehicleId":5,"busy":true,"error":false,"order":{"origin":"A","destination":"B"}}"""
+        val idle = """{"vehicleId":5,"busy":false,"error":false,"order":null}"""
+        assertFalse(AlarmClassifier.isAlarm("stubbe/agv/5/order", busy))
+        assertFalse(AlarmClassifier.isAlarm("stubbe/agv/5/order", idle))
+        assertFalse(AlarmClassifier.shouldNotify("stubbe/agv/orders", busy))
+    }
+
+    @Test
     fun stubbeAgvAlarmTrueNotifies() {
         val payload = """{"vehicleId":7,"alarm":true,"error":true,"state":"error","message":"AGV 7 in error."}"""
         val verdict = AlarmClassifier.evaluate("stubbe/agv/7/alarm", payload)

@@ -24,6 +24,7 @@ class HomeViewModel(
     val events = mqttManager.events
     val network = mqttManager.network
     val highlightedEventId = mqttManager.highlightedEventId
+    val vehicles = mqttManager.vehicles
     val notificationsEnabled: StateFlow<Boolean> = settingsRepository.settings
         .map { it.notificationsEnabled }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)

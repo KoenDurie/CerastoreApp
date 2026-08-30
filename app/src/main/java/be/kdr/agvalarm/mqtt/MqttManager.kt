@@ -7,6 +7,7 @@ import be.kdr.agvalarm.data.AppSettings
 import be.kdr.agvalarm.data.SettingsRepository
 import be.kdr.agvalarm.data.TopicSubscriptions
 import be.kdr.agvalarm.model.AgvAlarmPopup
+import be.kdr.agvalarm.model.AgvVehicleState
 import be.kdr.agvalarm.model.BrokerReachability
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
@@ -90,6 +91,9 @@ class MqttManager(
 
     private val _highlightedEventId = MutableStateFlow<Long?>(null)
     val highlightedEventId: StateFlow<Long?> = _highlightedEventId.asStateFlow()
+
+    private val _vehicles = MutableStateFlow<Map<Int, AgvVehicleState>>(emptyMap())
+    val vehicles: StateFlow<Map<Int, AgvVehicleState>> = _vehicles.asStateFlow()
 
     fun start() {
         if (!started.compareAndSet(false, true)) return
@@ -329,16 +333,27 @@ class MqttManager(
     }
 
     private fun handleMessage(topic: String, payload: String) {
+        val now = System.currentTimeMillis()
+        val orderStates = AgvOrderParser.parse(topic, payload, now)
+        if (orderStates.isNotEmpty()) {
+            _vehicles.update { current ->
+                val next = current.toMutableMap()
+                orderStates.forEach { next[it.vehicleId] = it }
+                next
+            }
+        }
         val verdict = AlarmClassifier.evaluate(topic, payload)
         val event = MqttEvent(
             id = eventSeq.incrementAndGet(),
-            timestampMillis = System.currentTimeMillis(),
+            timestampMillis = now,
             topic = topic,
             payload = payload,
             isAlarm = verdict.isActiveAlarm,
             isResolved = verdict.isResolved,
             agvId = verdict.vehicleId ?: AlarmClassifier.extractAgvId(topic, payload),
-            displayMessage = verdict.message,
+            displayMessage = verdict.message ?: orderStates.firstOrNull()?.let { state ->
+                state.routeLabel?.let { "${state.displayName} $it" } ?: state.displayName
+            },
         )
         _events.update { current ->
             (listOf(event) + current).take(MAX_EVENTS)

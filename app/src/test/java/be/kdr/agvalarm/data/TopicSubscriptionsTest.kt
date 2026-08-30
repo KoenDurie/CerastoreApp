@@ -24,6 +24,17 @@ class TopicSubscriptionsTest {
     }
 
     @Test
+    fun orderTopicsAreCoveredByAgvWildcard() {
+        assertTrue(TopicSubscriptions.DEFAULT.contains("stubbe/agv/#"))
+        assertTrue(TopicSubscriptions.isOrderTopic("stubbe/agv/5/order"))
+        assertTrue(TopicSubscriptions.isOrderTopic("stubbe/agv/orders"))
+        assertEquals(
+            listOf("stubbe/agv/+/order", "stubbe/agv/orders"),
+            TopicSubscriptions.ORDER_FILTERS,
+        )
+    }
+
+    @Test
     fun commandTopicsAreIdentified() {
         assertTrue(TopicSubscriptions.isCommandTopic("quality/robot/cmd"))
         assertTrue(TopicSubscriptions.isCommandTopic("quality/robot/ack"))

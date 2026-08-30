@@ -53,6 +53,7 @@ object AlarmClassifier {
 
     fun evaluate(topic: String, payload: String): AlarmVerdict {
         if (TopicSubscriptions.isCommandTopic(topic)) return AlarmVerdict.None
+        if (TopicSubscriptions.isOrderTopic(topic)) return AlarmVerdict.None
         if (topic.startsWith("inventory/", ignoreCase = true)) return AlarmVerdict.None
 
         val obj = parseObject(payload)

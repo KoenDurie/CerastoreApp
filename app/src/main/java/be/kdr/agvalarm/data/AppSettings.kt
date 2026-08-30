@@ -29,6 +29,9 @@ data class AppSettings(
 
 object TopicSubscriptions {
     val DEFAULT = listOf("inventory/#", "quality/status", "stubbe/agv/#")
+    /** Covered by `stubbe/agv/#` — do not subscribe twice or retained orders arrive twice. */
+    val ORDER_FILTERS = listOf("stubbe/agv/+/order", "stubbe/agv/orders")
+    private val ORDER_VEHICLE = Regex("""^stubbe/agv/[^/]+/order$""", RegexOption.IGNORE_CASE)
     private val COMMAND_TOPICS = setOf(
         "quality/robot/cmd",
         "quality/robot/ack",
@@ -45,4 +48,10 @@ object TopicSubscriptions {
 
     fun isCommandTopic(topic: String): Boolean =
         COMMAND_TOPICS.any { it.equals(topic, ignoreCase = true) }
+
+    fun isOrderTopic(topic: String): Boolean {
+        val t = topic.trim()
+        if (t.equals("stubbe/agv/orders", ignoreCase = true)) return true
+        return ORDER_VEHICLE.matches(t)
+    }
 }

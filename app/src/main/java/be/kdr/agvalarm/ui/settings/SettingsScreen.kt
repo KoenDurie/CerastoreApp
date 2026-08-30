@@ -109,7 +109,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Field("Wachtwoord (optioneel)", password, { password = it }, password = true)
                 Field("Extra topicfilter (optioneel, bv. #)", extraTopicFilter, { extraTopicFilter = it })
                 Text(
-                    "Standaard: inventory/#, quality/status en stubbe/agv/#. Geen publish, geen SQL.",
+                    "Standaard: inventory/#, quality/status en stubbe/agv/# (alarm + order). Geen publish, geen SQL.",
                     style = MaterialTheme.typography.labelSmall,
                 )
             }

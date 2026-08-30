@@ -32,11 +32,13 @@ Standaard subscribe (QoS 1), geen publish:
 
 - `inventory/#` — retained JSON `{locationName, productName, color, textColor}`
 - `quality/status` — Fanuc **kwaliteitsrobot** (niet de AGV-vloot)
-- `stubbe/agv/#` — sidecar AGV-alarmen: `stubbe/agv/{vehicleId}/alarm`
+- `stubbe/agv/#` — sidecar AGV-alarmen `stubbe/agv/{vehicleId}/alarm` én WMS-orders `stubbe/agv/{vehicleId}/order` (of snapshot `stubbe/agv/orders`)
 
 Niet abonneren als commander: `quality/robot/cmd` / `quality/robot/ack`. Extra topicfilter in Instellingen (leeg of `#` voor discovery).
 
 Actieve AGV-alarm JSON (retain, QoS 1): `{"vehicleId":7,"alarm":true,"error":true,"state":"error","message":"AGV 7 in error."}` → heads-up + dialog **AGV 7 storing**. Clear (`alarm:false`) geeft geen melding, wel “OPGELOST” in de log.
+
+WMS-order (retain, QoS 1): `busy:true` + order → Home-strip, tik voor details. `busy:false` / `order:null` / JBT HOME of ChargePark is **geen** alarm en verschijnt niet in Storingen.
 
 `quality/status` met `error` / `robotInError` / `alarm` geeft **Kwaliteitsrobot storing** (geen AGV-dialog). Inventory never notifies.
 

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import be.kdr.agvalarm.data.AppSettings
+import be.kdr.agvalarm.data.TopicSubscriptions
+import be.kdr.agvalarm.model.AgvVehicleState
 import be.kdr.agvalarm.model.BrokerTarget
 import be.kdr.agvalarm.model.ConnectionStatus
 import be.kdr.agvalarm.model.ConnectionUiState
@@ -54,6 +57,8 @@ fun HomeScreen(
     val network by viewModel.network.collectAsStateWithLifecycle()
     val notifications by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
     val highlightId by viewModel.highlightedEventId.collectAsStateWithLifecycle()
+    val vehicles by viewModel.vehicles.collectAsStateWithLifecycle()
+    var selectedOrder by remember { mutableStateOf<AgvVehicleState?>(null) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -121,6 +126,13 @@ fun HomeScreen(
                     label = "meldingen",
                 )
             }
+        }
+        item {
+            AgvOrderStrip(
+                vehicles = vehicles,
+                alarmIds = activeAgvs.mapNotNull { it.agvId }.toSet(),
+                onOpen = { selectedOrder = it },
+            )
         }
         if (homeOffline) {
             item {
@@ -206,7 +218,7 @@ fun HomeScreen(
                     EmptyTraffic(connection)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        events.take(5).forEach { event ->
+                        events.filter { !TopicSubscriptions.isOrderTopic(it.topic) }.take(5).forEach { event ->
                             EventRow(
                                 event = event,
                                 highlighted = event.id == highlightId,
@@ -218,13 +230,16 @@ fun HomeScreen(
             }
         }
     }
+    selectedOrder?.let { state ->
+        AgvOrderSheet(state = state, onDismiss = { selectedOrder = null })
+    }
 }
 
 @Composable
 private fun EmptyTraffic(connection: ConnectionUiState) {
     val text = when {
         connection.status == ConnectionStatus.CONNECTED ->
-            "Nog geen MQTT-berichten. Geabonneerd op inventory/#, quality/status en stubbe/agv/#."
+            "Nog geen MQTT-berichten. Geabonneerd op inventory/#, quality/status, stubbe/agv/# (alarm + order)."
         else -> "Wachten op verbinding met de broker."
     }
     Text(text, style = MaterialTheme.typography.bodyMedium, color = LabelGrey)

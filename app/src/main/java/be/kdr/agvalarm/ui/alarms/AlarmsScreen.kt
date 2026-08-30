@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import be.kdr.agvalarm.data.TopicSubscriptions
 import be.kdr.agvalarm.ui.HomeViewModel
 import be.kdr.agvalarm.ui.events.EventRow
 import be.kdr.agvalarm.ui.theme.Ink
@@ -24,10 +25,11 @@ fun AlarmsScreen(viewModel: HomeViewModel) {
     val events by viewModel.events.collectAsStateWithLifecycle()
     val highlightId by viewModel.highlightedEventId.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val visible = events.filter { !TopicSubscriptions.isOrderTopic(it.topic) }
 
-    LaunchedEffect(highlightId, events) {
+    LaunchedEffect(highlightId, visible) {
         val id = highlightId ?: return@LaunchedEffect
-        val index = events.indexOfFirst { it.id == id }
+        val index = visible.indexOfFirst { it.id == id }
         if (index >= 0) listState.animateScrollToItem(index)
     }
 
@@ -40,12 +42,12 @@ fun AlarmsScreen(viewModel: HomeViewModel) {
         item {
             Text("Storingen", style = MaterialTheme.typography.headlineMedium, color = Ink)
             Text(
-                "MQTT-log, nieuwste eerst. AGV-sidecar en kwaliteitsrobot.",
+                "MQTT-log, nieuwste eerst. AGV-alarmen en kwaliteitsrobot — geen idle HOME/orders.",
                 style = MaterialTheme.typography.labelSmall,
                 color = LabelGrey,
             )
         }
-        if (events.isEmpty()) {
+        if (visible.isEmpty()) {
             item {
                 Text(
                     "Nog geen berichten.",
@@ -54,7 +56,7 @@ fun AlarmsScreen(viewModel: HomeViewModel) {
                 )
             }
         } else {
-            items(events, key = { it.id }) { event ->
+            items(visible, key = { it.id }) { event ->
                 EventRow(event = event, highlighted = event.id == highlightId, compact = false)
             }
         }
