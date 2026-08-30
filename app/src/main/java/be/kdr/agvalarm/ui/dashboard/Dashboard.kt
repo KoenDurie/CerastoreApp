@@ -1,6 +1,7 @@
 package be.kdr.agvalarm.ui.dashboard
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -37,16 +40,21 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import be.kdr.agvalarm.R
 import be.kdr.agvalarm.ui.theme.AccentOrange
 import be.kdr.agvalarm.ui.theme.CardWhite
 import be.kdr.agvalarm.ui.theme.Coral
-import be.kdr.agvalarm.ui.theme.GlassWhite
 import be.kdr.agvalarm.ui.theme.Ink
 import be.kdr.agvalarm.ui.theme.LabelGrey
 import be.kdr.agvalarm.ui.theme.SageCanvas
@@ -66,6 +74,10 @@ fun DashboardScaffold(
     onSelect: (DashTab) -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val heroStrength = when (current) {
+        DashTab.Settings -> 0.16f
+        else -> 1f
+    }
     Box(Modifier.fillMaxSize()) {
         FactoryWashBackground()
         Column(
@@ -80,9 +92,20 @@ fun DashboardScaffold(
                     .weight(1f)
                     .fillMaxWidth()
                     .shadow(18.dp, RoundedCornerShape(26.dp), ambientColor = Color(0x33000000))
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(GlassWhite),
+                    .clip(RoundedCornerShape(26.dp)),
             ) {
+                AgvHeroLayer(strength = heroStrength)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0.00f to Color(0x38F4F2EC),
+                                0.36f to Color(0x22F4F2EC),
+                                1.00f to Color(0xC2F4F2EC),
+                            ),
+                        ),
+                )
                 Column(Modifier.fillMaxSize()) {
                     BrandHeader(modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 18.dp))
                     Spacer(Modifier.height(12.dp))
@@ -104,6 +127,20 @@ fun DashboardScaffold(
     }
 }
 
+private val HeroSageMatrix: ColorMatrix = ColorMatrix().apply {
+    setToSaturation(0.28f)
+    timesAssign(
+        ColorMatrix(
+            floatArrayOf(
+                0.62f, 0.12f, 0.08f, 0f, 28f,
+                0.10f, 0.66f, 0.10f, 0f, 30f,
+                0.08f, 0.12f, 0.55f, 0f, 24f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        ),
+    )
+}
+
 @Composable
 fun FactoryWashBackground() {
     Canvas(Modifier.fillMaxSize()) {
@@ -112,22 +149,55 @@ fun FactoryWashBackground() {
                 listOf(SageCanvas, Color(0xFF959A8B), SageDeep),
             ),
         )
-        val aisle = Color(0x33F4F2EC)
-        val unitW = size.width / 7f
-        for (i in 0..6) {
-            drawRect(
-                color = aisle,
-                topLeft = Offset(i * unitW + unitW * 0.18f, size.height * 0.18f),
-                size = Size(unitW * 0.22f, size.height * 0.72f),
+    }
+}
+
+@Composable
+private fun AgvHeroLayer(strength: Float, modifier: Modifier = Modifier) {
+    val alpha = strength.coerceIn(0f, 1f)
+    Box(modifier.fillMaxSize().background(SageCanvas)) {
+        if (alpha > 0.01f) {
+            Image(
+                painter = painterResource(id = R.drawable.agv_hero),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.84f)
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { this.alpha = 0.94f * alpha },
+                contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(0.72f, 0.78f),
+                colorFilter = ColorFilter.colorMatrix(HeroSageMatrix),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(SageCanvas.copy(alpha = 0.40f + (1f - alpha) * 0.42f)),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.00f to SageCanvas.copy(alpha = 0.22f * alpha),
+                            0.26f to Color.Transparent,
+                            0.58f to SageCanvas.copy(alpha = 0.22f * alpha),
+                            1.00f to SageCanvas.copy(alpha = 0.90f),
+                        ),
+                    ),
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0.00f to SageCanvas.copy(alpha = 0.20f * alpha),
+                            0.38f to Color.Transparent,
+                            1.00f to Color.Transparent,
+                        ),
+                    ),
             )
         }
-        drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0x22FFFFFF), Color.Transparent),
-                center = Offset(size.width * 0.75f, size.height * 0.22f),
-                radius = size.minDimension * 0.55f,
-            ),
-        )
     }
 }
 
