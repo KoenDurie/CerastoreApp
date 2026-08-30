@@ -1,0 +1,7 @@
+-keep class com.hivemq.client.** { *; }
+-keep class io.netty.** { *; }
+-dontwarn io.netty.**
+-dontwarn com.google.common.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**

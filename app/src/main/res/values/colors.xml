@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sage_canvas">#FF8B9081</color>
+    <color name="sage_deep">#FF6F7566</color>
+    <color name="accent_orange">#FFF26522</color>
+    <color name="ic_launcher_background">#FF8B9081</color>
+    <color name="charcoal">#FF8B9081</color>
+    <color name="charcoal_deep">#FF6F7566</color>
+    <color name="amber">#FFF26522</color>
+</resources>

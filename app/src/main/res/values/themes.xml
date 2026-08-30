@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AgvAlarm" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/sage_canvas</item>
+        <item name="android:navigationBarColor">@color/sage_canvas</item>
+        <item name="android:windowBackground">@color/sage_canvas</item>
+        <item name="android:colorPrimary">@color/accent_orange</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
