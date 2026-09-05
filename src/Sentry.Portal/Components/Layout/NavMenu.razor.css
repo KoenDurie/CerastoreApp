@@ -1,0 +1,85 @@
+.nav-brand {
+    background: #0b0f15;
+    padding: 1.2rem 1rem 1rem;
+    border-bottom: 1px solid #243044;
+}
+
+.nav-brand a {
+    color: #f3d19a;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    font-size: 1.1rem;
+}
+
+.nav-brand small {
+    display: block;
+    color: #8b97a8;
+    margin-top: 0.2rem;
+}
+
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 3.2rem;
+    height: 2.5rem;
+    position: absolute;
+    top: 0.6rem;
+    right: 1rem;
+    border: 1px solid #3a4658;
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28243, 209, 154, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem;
+}
+
+.nav-scrollable {
+    display: none;
+}
+
+.navbar-toggler:checked ~ .nav-scrollable {
+    display: block;
+}
+
+.nav-item {
+    padding: 0.15rem 0.8rem;
+}
+
+.nav-item ::deep .nav-link {
+    color: #d5dde8;
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    display: block;
+    text-decoration: none;
+}
+
+.nav-item ::deep a.active {
+    background: #243044;
+    color: #f3d19a;
+}
+
+.muted {
+    color: #8b97a8;
+}
+
+@media (min-width: 641px) {
+    .page ::deep .sidebar,
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        display: block;
+    }
+
+    .navbar-toggler {
+        display: none;
+    }
+}
+
+@media (min-width: 641px) {
+    ::deep .sidebar {
+        width: 230px;
+        height: 100vh;
+        background: #121820;
+        border-right: 1px solid #243044;
+    }
+}

@@ -1,0 +1,140 @@
+html, body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: #0f141c;
+    color: #e6edf5;
+}
+
+h1, h2, h3 {
+    color: #f4f7fb;
+    font-weight: 650;
+}
+
+a { color: #e8c07a; }
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.5rem;
+}
+
+.kpi {
+    background: #161d28;
+    border: 1px solid #243044;
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+}
+
+.kpi .label {
+    color: #8b97a8;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.kpi .value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-top: 0.25rem;
+}
+
+.kpi.warn .value { color: #e8c07a; }
+.kpi.bad .value { color: #e07a6a; }
+.kpi.ok .value { color: #7dce9a; }
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #161d28;
+    border: 1px solid #243044;
+}
+
+.data-table th, .data-table td {
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid #243044;
+    text-align: left;
+    font-size: 0.92rem;
+}
+
+.data-table th {
+    color: #8b97a8;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+}
+
+.badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-active { background: #5a2a24; color: #f0b3aa; }
+.badge-cleared { background: #243628; color: #9ed8b0; }
+.badge-anomaly { background: #5a3d14; color: #f3d19a; }
+
+.panel {
+    background: #161d28;
+    border: 1px solid #243044;
+    border-radius: 10px;
+    padding: 1.25rem;
+    max-width: 420px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-bottom: 0.9rem;
+}
+
+.form-field input, .form-field button, .btn {
+    border-radius: 6px;
+    border: 1px solid #3a4658;
+    padding: 0.5rem 0.7rem;
+    background: #0f141c;
+    color: #e6edf5;
+}
+
+.btn, .form-field button[type=submit] {
+    background: #c9842a;
+    color: #141414;
+    border: 0;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.alert-error {
+    background: #5a2a24;
+    color: #f0b3aa;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.empty {
+    color: #8b97a8;
+    padding: 1rem 0;
+}
+
+#blazor-error-ui {
+    background: #5a2a24;
+    color: #f0b3aa;
+    bottom: 0;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}

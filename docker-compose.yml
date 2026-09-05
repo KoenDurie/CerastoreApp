@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sentry
+      POSTGRES_PASSWORD: sentry
+      POSTGRES_DB: sentry
+    ports:
+      - "5432:5432"
+    volumes:
+      - sentry-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  portal:
+    build:
+      context: .
+      dockerfile: src/Sentry.Portal/Dockerfile
+    environment:
+      Sentry__Database: Postgres
+      ConnectionStrings__Default: Host=postgres;Database=sentry;Username=sentry;Password=sentry
+      Sentry__DefaultTenantSlug: stubbe
+      Sentry__SeedDemoData: "true"
+      ASPNETCORE_ENVIRONMENT: Production
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - portal
+
+volumes:
+  sentry-pg:

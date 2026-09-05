@@ -1,0 +1,53 @@
+@page "/battery"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Query
+
+<PageTitle>Sentry · Batterijen</PageTitle>
+
+<h1>Batterijen</h1>
+
+@if (Tenant.Current?.FeatureBattery != true)
+{
+    <p class="empty">Batterijmonitoring zit niet in dit pakket.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Asset</th>
+                <th>%</th>
+                <th>Status</th>
+                <th>Tijdstip</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _rows)
+            {
+                <tr>
+                    <td>@row.AssetLabel</td>
+                    <td>
+                        <span class="@(row.BatteryPercent < 20 ? "badge badge-active" : "badge badge-cleared")">
+                            @(row.BatteryPercent is null ? "—" : $"{row.BatteryPercent:0}%")
+                        </span>
+                    </td>
+                    <td>@row.Status</td>
+                    <td>@row.RecordedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<BatteryRow> _rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current?.FeatureBattery == true)
+        {
+            _rows = await Query.LatestBatteryAsync(Tenant.Current.Id);
+        }
+    }
+}

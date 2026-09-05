@@ -1,0 +1,72 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Alarms
+@inject Sentry.Portal.Data.SentryDbContext Db
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Sentry · Overzicht</PageTitle>
+
+<h1>Overzicht</h1>
+<p class="empty">@(Tenant.Current?.Name ?? "Geen tenant") — alleen eigen data.</p>
+
+@if (Tenant.Current is null)
+{
+    <p>Geen tenant op deze host. Lokaal: zet <code>Sentry:DefaultTenantSlug</code> of stuur header <code>X-Tenant</code>.</p>
+}
+else
+{
+    <div class="kpi-grid">
+        @if (Tenant.Current.FeatureAlarms)
+        {
+            <div class="kpi bad">
+                <div class="label">Actieve alarmen</div>
+                <div class="value">@_active</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Vandaag</div>
+                <div class="value">@_today</div>
+            </div>
+        }
+        @if (Tenant.Current.FeatureBattery)
+        {
+            <div class="kpi @(_lowBattery > 0 ? "warn" : "ok")">
+                <div class="label">Laagste batterij</div>
+                <div class="value">@(_lowest is null ? "—" : $"{_lowest:0}%")</div>
+            </div>
+        }
+        <div class="kpi">
+            <div class="label">Laatste heartbeat</div>
+            <div class="value" style="font-size:1rem;padding-top:0.6rem">@(_heartbeat?.ToLocalTime().ToString("dd/MM HH:mm") ?? "geen")</div>
+        </div>
+    </div>
+}
+
+@code {
+    private int _active;
+    private int _today;
+    private double? _lowest;
+    private int _lowBattery;
+    private DateTime? _heartbeat;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current is null)
+        {
+            return;
+        }
+
+        var id = Tenant.Current.Id;
+        var start = DateTime.UtcNow.Date;
+        _active = await Alarms.ForTenant(id).CountAsync(e => e.State == AlarmState.Active);
+        _today = await Alarms.ForTenant(id).CountAsync(e => e.StartedAt >= start);
+        var batteries = await Alarms.LatestBatteryAsync(id);
+        _lowest = batteries.Select(b => b.BatteryPercent).OfType<double>().DefaultIfEmpty().Min();
+        if (!batteries.Any(b => b.BatteryPercent.HasValue))
+        {
+            _lowest = null;
+        }
+        _lowBattery = batteries.Count(b => b.BatteryPercent < 20);
+        _heartbeat = await Db.Sites.Where(s => s.TenantId == id).MaxAsync(s => s.LastHeartbeatAt);
+    }
+}

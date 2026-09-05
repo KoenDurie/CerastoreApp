@@ -1,0 +1,103 @@
+@page "/contacts"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject TenantContext Tenant
+@inject Sentry.Portal.Data.SentryDbContext Db
+@using Microsoft.EntityFrameworkCore
+
+<PageTitle>Sentry · SMS-contacten</PageTitle>
+
+<h1>SMS-contacten</h1>
+<p class="empty">SNS verstuurt alleen als <code>Sentry:Sns:TopicArn</code> is gezet. Anders wordt de melding gelogd.</p>
+
+@if (Tenant.Current?.FeatureBattery != true)
+{
+    <p class="empty">SMS-alerts horen bij de batterijmodule.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Naam</th>
+                <th>Telefoon</th>
+                <th>SMS</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in _contacts)
+            {
+                <tr>
+                    <td>@c.Name</td>
+                    <td>@c.PhoneE164</td>
+                    <td>@(c.SmsEnabled ? "aan" : "uit")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h2 style="margin-top:1.5rem">Nieuwe contact</h2>
+    <div class="panel">
+        <div class="form-field">
+            <label>Naam</label>
+            <input @bind="_name" />
+        </div>
+        <div class="form-field">
+            <label>Telefoon (E.164)</label>
+            <input @bind="_phone" placeholder="+32..." />
+        </div>
+        <button class="btn" @onclick="AddAsync">Bewaren</button>
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <p class="empty">@_message</p>
+        }
+    </div>
+}
+
+@code {
+    private List<AlertContact> _contacts = [];
+    private string _name = "";
+    private string _phone = "";
+    private string? _message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (Tenant.Current is null)
+        {
+            return;
+        }
+
+        _contacts = await Db.AlertContacts
+            .Where(c => c.TenantId == Tenant.Current.Id)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        if (Tenant.Current is null || string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_phone))
+        {
+            _message = "Naam en telefoon zijn verplicht.";
+            return;
+        }
+
+        Db.AlertContacts.Add(new AlertContact
+        {
+            Id = Guid.NewGuid(),
+            TenantId = Tenant.Current.Id,
+            Name = _name.Trim(),
+            PhoneE164 = _phone.Trim(),
+            SmsEnabled = true
+        });
+        await Db.SaveChangesAsync();
+        _name = "";
+        _phone = "";
+        _message = "Contact bewaard.";
+        await ReloadAsync();
+    }
+}

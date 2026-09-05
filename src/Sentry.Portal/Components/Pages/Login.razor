@@ -1,0 +1,55 @@
+@page "/login"
+@layout Layout.MainLayout
+@attribute [AllowAnonymous]
+@inject TenantContext Tenant
+@inject NavigationManager Nav
+
+<PageTitle>Sentry · Inloggen</PageTitle>
+
+<h1>Inloggen</h1>
+<p class="empty">@(Tenant.Current?.Name ?? "Sentry") — lokale accounts, geen Cerastore-login.</p>
+
+<div class="panel">
+    @if (_error == "tenant")
+    {
+        <div class="alert-error">Dit account hoort niet bij @(Tenant.Current?.Name ?? "deze tenant").</div>
+    }
+    else if (_error == "1")
+    {
+        <div class="alert-error">Onjuiste e-mail of wachtwoord.</div>
+    }
+
+    <form method="post" action="/account/login">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@_returnUrl" />
+        <div class="form-field">
+            <label>E-mail</label>
+            <input name="email" type="email" autocomplete="username" required />
+        </div>
+        <div class="form-field">
+            <label>Wachtwoord</label>
+            <input name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="form-field">
+            <button type="submit">Inloggen</button>
+        </div>
+    </form>
+    <p class="empty">Demo: admin@stubbe.local · admin@stt.local · admin@weerts.local · @Sentry.Portal.Data.SeedData.DevPassword</p>
+</div>
+
+@code {
+    private string? _error;
+    private string _returnUrl = "/";
+
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _error = Error;
+        if (!string.IsNullOrWhiteSpace(ReturnUrl) && ReturnUrl.StartsWith('/'))
+        {
+            _returnUrl = ReturnUrl;
+        }
+    }
+}
