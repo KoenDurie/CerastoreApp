@@ -1,0 +1,36 @@
+﻿@inherits LayoutComponentBase
+@inject TenantContext Tenant
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row">
+            <div>
+                <span class="tenant-chip">@(Tenant.Current?.Name ?? "Sentry")</span>
+                <span class="muted">overlay · geen WCS</span>
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <span class="muted">@context.User.Identity?.Name</span>
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button type="submit" class="link-btn">Uitloggen</button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    Er ging iets mis.
+    <a href="" class="reload">Opnieuw</a>
+    <a class="dismiss">✕</a>
+</div>

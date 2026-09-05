@@ -1,0 +1,19 @@
+{
+	local_certs
+}
+
+:80 {
+	reverse_proxy portal:8080
+}
+
+stubbe.localhost {
+	reverse_proxy portal:8080
+}
+
+stt.localhost {
+	reverse_proxy portal:8080
+}
+
+weerts.localhost {
+	reverse_proxy portal:8080
+}

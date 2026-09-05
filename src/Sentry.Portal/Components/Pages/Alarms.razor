@@ -1,0 +1,57 @@
+@page "/alarms"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Query
+
+<PageTitle>Sentry · Alarmen</PageTitle>
+
+<h1>Alarmen</h1>
+
+@if (Tenant.Current?.FeatureAlarms != true)
+{
+    <p class="empty">Alarmen zitten niet in dit pakket.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Start</th>
+                <th>Asset</th>
+                <th>Zone</th>
+                <th>Code</th>
+                <th>Beschrijving</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var alarm in _rows)
+            {
+                <tr>
+                    <td>@alarm.StartedAt.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                    <td>@alarm.AssetLabel</td>
+                    <td>@alarm.Zone</td>
+                    <td>@alarm.Code</td>
+                    <td>@alarm.Description</td>
+                    <td>
+                        <span class="badge @(alarm.State == AlarmState.Active ? "badge-active" : "badge-cleared")">
+                            @alarm.State
+                        </span>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<AlarmEvent> _rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current?.FeatureAlarms == true)
+        {
+            _rows = await Query.ListAsync(Tenant.Current.Id, state: null, take: 200);
+        }
+    }
+}

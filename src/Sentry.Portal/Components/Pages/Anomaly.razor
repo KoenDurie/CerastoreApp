@@ -1,0 +1,61 @@
+@page "/anomaly"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Query
+
+<PageTitle>Sentry · Anomalie</PageTitle>
+
+<h1>Anomalie</h1>
+<p class="empty">score = (recent − baseline) / (σ + 1) · drempel @AnomalyScorer.Threshold.ToString("0.0")</p>
+
+@if (Tenant.Current?.FeatureAlarms != true)
+{
+    <p class="empty">Alarmen zitten niet in dit pakket.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Asset</th>
+                <th>Recent</th>
+                <th>Baseline</th>
+                <th>σ</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _rows)
+            {
+                <tr>
+                    <td>@row.AssetLabel</td>
+                    <td>@row.RecentCount.ToString("0")</td>
+                    <td>@row.BaselineAvg.ToString("0.00")</td>
+                    <td>@row.StdDev.ToString("0.00")</td>
+                    <td>
+                        @if (row.IsAnomaly)
+                        {
+                            <span class="badge badge-anomaly">@row.Score.ToString("0.00")</span>
+                        }
+                        else
+                        {
+                            @row.Score.ToString("0.00")
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<AnomalyRow> _rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current?.FeatureAlarms == true)
+        {
+            _rows = await Query.AnomaliesAsync(Tenant.Current.Id, DateTimeOffset.UtcNow);
+        }
+    }
+}

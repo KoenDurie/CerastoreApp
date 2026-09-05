@@ -1,0 +1,47 @@
+@page "/daily"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Query
+
+<PageTitle>Sentry · Dagrappor</PageTitle>
+
+<h1>Dagrappor</h1>
+
+@if (Tenant.Current?.FeatureAlarms != true)
+{
+    <p class="empty">Alarmen zitten niet in dit pakket.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Dag</th>
+                <th>Totaal</th>
+                <th>Nog actief</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _rows)
+            {
+                <tr>
+                    <td>@row.Day.ToString("dd/MM/yyyy")</td>
+                    <td>@row.Total</td>
+                    <td>@row.Active</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<DailyRow> _rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current?.FeatureAlarms == true)
+        {
+            _rows = await Query.DailyAsync(Tenant.Current.Id, 21);
+        }
+    }
+}

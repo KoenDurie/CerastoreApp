@@ -1,0 +1,46 @@
+﻿@inject TenantContext Tenant
+
+<div class="nav-brand">
+    <a href="">Sentry</a>
+    <small>@Tenant.Current?.Name</small>
+</div>
+
+<input type="checkbox" title="Menu" class="navbar-toggler" />
+
+<div class="nav-scrollable">
+    <nav class="flex-column">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Overzicht</NavLink>
+        </div>
+        @if (Tenant.Current?.FeatureAlarms == true)
+        {
+            <div class="nav-item">
+                <NavLink class="nav-link" href="alarms">Alarmen</NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="anomaly">Anomalie</NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="daily">Dagrappor</NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="summary">Samenvatting</NavLink>
+            </div>
+        }
+        @if (Tenant.Current?.FeatureBattery == true)
+        {
+            <div class="nav-item">
+                <NavLink class="nav-link" href="battery">Batterijen</NavLink>
+            </div>
+            <div class="nav-item">
+                <NavLink class="nav-link" href="contacts">SMS-contacten</NavLink>
+            </div>
+        }
+        @if (Tenant.Current?.FeatureMobileApp == true)
+        {
+            <div class="nav-item">
+                <span class="nav-link muted">Mobiele app aan</span>
+            </div>
+        }
+    </nav>
+</div>

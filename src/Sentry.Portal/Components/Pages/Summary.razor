@@ -1,0 +1,50 @@
+@page "/summary"
+@attribute [Authorize]
+@inject TenantContext Tenant
+@inject AlarmQueryService Query
+
+<PageTitle>Sentry · Samenvatting</PageTitle>
+
+<h1>Samenvatting</h1>
+<p class="empty">Laatste 14 dagen, per asset.</p>
+
+@if (Tenant.Current?.FeatureAlarms != true)
+{
+    <p class="empty">Alarmen zitten niet in dit pakket.</p>
+}
+else
+{
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Asset</th>
+                <th>Totaal</th>
+                <th>Actief</th>
+                <th>Laatst gezien</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in _rows)
+            {
+                <tr>
+                    <td>@row.AssetLabel</td>
+                    <td>@row.Total</td>
+                    <td>@row.Active</td>
+                    <td>@row.LastSeen.ToLocalTime().ToString("dd/MM HH:mm")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<SummaryRow> _rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Tenant.Current?.FeatureAlarms == true)
+        {
+            _rows = await Query.SummaryAsync(Tenant.Current.Id, 14);
+        }
+    }
+}
