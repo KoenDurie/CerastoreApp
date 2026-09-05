@@ -8,5 +8,5 @@ public sealed class Site
     public string Name { get; set; } = "";
     public string ApiKey { get; set; } = "";
     public string SourceKind { get; set; } = "Unknown";
-    public DateTimeOffset? LastHeartbeatAt { get; set; }
+    public DateTime? LastHeartbeatAt { get; set; }
 }

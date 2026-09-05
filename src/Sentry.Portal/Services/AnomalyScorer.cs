@@ -31,21 +31,21 @@ public static class AnomalyScorer
 
     public static IReadOnlyList<AnomalyRow> ScoreByAsset(
         IEnumerable<AlarmEvent> events,
-        DateTimeOffset now,
+        DateTime nowUtc,
         int recentDays = 1,
         int baselineDays = 14)
     {
-        var recentFrom = now.UtcDateTime.Date.AddDays(1 - recentDays);
+        var recentFrom = nowUtc.ToUniversalTime().Date.AddDays(1 - recentDays);
         var baselineFrom = recentFrom.AddDays(-baselineDays);
         var rows = new List<AnomalyRow>();
 
         foreach (var group in events.GroupBy(e => string.IsNullOrWhiteSpace(e.AssetLabel) ? "onbekend" : e.AssetLabel!))
         {
-            var recentCount = group.Count(e => e.StartedAt.UtcDateTime >= recentFrom);
+            var recentCount = group.Count(e => e.StartedAt >= recentFrom);
             var daily = new double[baselineDays];
             foreach (var ev in group)
             {
-                var day = ev.StartedAt.UtcDateTime.Date;
+                var day = ev.StartedAt.Date;
                 if (day >= baselineFrom && day < recentFrom)
                 {
                     var idx = (int)(day - baselineFrom).TotalDays;

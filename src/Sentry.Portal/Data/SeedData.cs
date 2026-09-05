@@ -105,7 +105,7 @@ public static class SeedData
 
     private static void SeedDemoAlarms(SentryDbContext db)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         AddSeries(db, SeedIds.Stubbe, SeedIds.StubbeSite, "JBT", "AGV-04", "Conv4", "E-STOP", "E-stop ingedrukt", now, days: 18, daily: 2, extraToday: 9);
         AddSeries(db, SeedIds.Stubbe, SeedIds.StubbeSite, "JBT", "AGV-12", "Dock", "BLOCK", "Pad geblokkeerd", now, days: 18, daily: 1, extraToday: 0);
         AddSeries(db, SeedIds.Stt, SeedIds.SttSite, "MFCS", "Shuttle-B2", "HB", "TIMEOUT", "Shuttle timeout", now, days: 16, daily: 3, extraToday: 1);
@@ -137,7 +137,7 @@ public static class SeedData
         string zone,
         string code,
         string description,
-        DateTimeOffset now,
+        DateTime now,
         int days,
         int daily,
         int extraToday)
@@ -163,8 +163,8 @@ public static class SeedData
                     Description = description,
                     Severity = "medium",
                     State = AlarmState.Cleared,
-                    StartedAt = new DateTimeOffset(started, TimeSpan.Zero),
-                    EndedAt = new DateTimeOffset(started.AddMinutes(8 + i), TimeSpan.Zero)
+                    StartedAt = started,
+                    EndedAt = started.AddMinutes(8 + i)
                 });
             }
         }
@@ -172,7 +172,7 @@ public static class SeedData
 
     private static void SeedDemoTelemetry(SentryDbContext db)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
         var weerts = new (string Label, double Pct, string Status)[]
         {
             ("SH-01", 82, "idle"),

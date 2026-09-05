@@ -61,7 +61,7 @@ public sealed class SmsAlertService(SentryDbContext db, IConfiguration config, I
                 Channel = "sms",
                 Target = contact.PhoneE164,
                 Message = message,
-                SentAt = DateTimeOffset.UtcNow,
+                SentAt = DateTime.UtcNow,
                 Status = status
             });
         }

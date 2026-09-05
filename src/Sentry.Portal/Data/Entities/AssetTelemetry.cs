@@ -10,6 +10,6 @@ public sealed class AssetTelemetry
     public string AssetLabel { get; set; } = "";
     public double? BatteryPercent { get; set; }
     public string? Status { get; set; }
-    public DateTimeOffset RecordedAt { get; set; }
+    public DateTime RecordedAt { get; set; }
     public string? PayloadJson { get; set; }
 }

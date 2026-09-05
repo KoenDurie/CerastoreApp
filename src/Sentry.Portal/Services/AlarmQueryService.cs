@@ -9,7 +9,7 @@ public sealed class AlarmQueryService(SentryDbContext db)
     public IQueryable<AlarmEvent> ForTenant(Guid tenantId)
         => db.AlarmEvents.AsNoTracking().Where(e => e.TenantId == tenantId);
 
-    public Task<List<AlarmEvent>> ListAsync(Guid tenantId, AlarmState? state, int take, CancellationToken cancellationToken = default)
+    public async Task<List<AlarmEvent>> ListAsync(Guid tenantId, AlarmState? state, int take, CancellationToken cancellationToken = default)
     {
         var q = ForTenant(tenantId);
         if (state is not null)
@@ -17,27 +17,28 @@ public sealed class AlarmQueryService(SentryDbContext db)
             q = q.Where(e => e.State == state);
         }
 
-        return q.OrderByDescending(e => e.StartedAt).Take(take).ToListAsync(cancellationToken);
+        var rows = await q.ToListAsync(cancellationToken);
+        return rows.OrderByDescending(e => e.StartedAt).Take(take).ToList();
     }
 
-    public async Task<IReadOnlyList<AnomalyRow>> AnomaliesAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<AnomalyRow>> AnomaliesAsync(Guid tenantId, DateTime nowUtc, CancellationToken cancellationToken = default)
     {
-        var from = now.AddDays(-30);
+        var from = nowUtc.AddDays(-30);
         var events = await ForTenant(tenantId)
             .Where(e => e.StartedAt >= from)
             .ToListAsync(cancellationToken);
-        return AnomalyScorer.ScoreByAsset(events, now);
+        return AnomalyScorer.ScoreByAsset(events, nowUtc);
     }
 
     public async Task<IReadOnlyList<DailyRow>> DailyAsync(Guid tenantId, int days, CancellationToken cancellationToken = default)
     {
-        var from = DateTimeOffset.UtcNow.AddDays(-days);
+        var from = DateTime.UtcNow.AddDays(-days);
         var events = await ForTenant(tenantId)
             .Where(e => e.StartedAt >= from)
             .ToListAsync(cancellationToken);
 
         return events
-            .GroupBy(e => e.StartedAt.UtcDateTime.Date)
+            .GroupBy(e => e.StartedAt.Date)
             .OrderBy(g => g.Key)
             .Select(g => new DailyRow(DateOnly.FromDateTime(g.Key), g.Count(), g.Count(x => x.State == AlarmState.Active)))
             .ToList();
@@ -45,7 +46,7 @@ public sealed class AlarmQueryService(SentryDbContext db)
 
     public async Task<IReadOnlyList<SummaryRow>> SummaryAsync(Guid tenantId, int days, CancellationToken cancellationToken = default)
     {
-        var from = DateTimeOffset.UtcNow.AddDays(-days);
+        var from = DateTime.UtcNow.AddDays(-days);
         var events = await ForTenant(tenantId)
             .Where(e => e.StartedAt >= from)
             .ToListAsync(cancellationToken);
@@ -75,5 +76,5 @@ public sealed class AlarmQueryService(SentryDbContext db)
 }
 
 public sealed record DailyRow(DateOnly Day, int Total, int Active);
-public sealed record SummaryRow(string AssetLabel, int Total, int Active, DateTimeOffset LastSeen);
-public sealed record BatteryRow(string AssetLabel, double? BatteryPercent, string? Status, DateTimeOffset RecordedAt);
+public sealed record SummaryRow(string AssetLabel, int Total, int Active, DateTime LastSeen);
+public sealed record BatteryRow(string AssetLabel, double? BatteryPercent, string? Status, DateTime RecordedAt);

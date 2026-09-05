@@ -23,8 +23,8 @@ public sealed class AlarmEvent
     public string? Details { get; set; }
     public string? Severity { get; set; }
     public AlarmState State { get; set; }
-    public DateTimeOffset StartedAt { get; set; }
-    public DateTimeOffset? EndedAt { get; set; }
-    public DateTimeOffset? ConfirmedAt { get; set; }
+    public DateTime StartedAt { get; set; }
+    public DateTime? EndedAt { get; set; }
+    public DateTime? ConfirmedAt { get; set; }
     public string? PayloadJson { get; set; }
 }

@@ -8,6 +8,6 @@ public sealed class NotificationLog
     public string Channel { get; set; } = "sms";
     public string Target { get; set; } = "";
     public string Message { get; set; } = "";
-    public DateTimeOffset SentAt { get; set; }
+    public DateTime SentAt { get; set; }
     public string Status { get; set; } = "logged";
 }

@@ -55,7 +55,7 @@ else
     {
         if (Tenant.Current?.FeatureAlarms == true)
         {
-            _rows = await Query.AnomaliesAsync(Tenant.Current.Id, DateTimeOffset.UtcNow);
+            _rows = await Query.AnomaliesAsync(Tenant.Current.Id, DateTime.UtcNow);
         }
     }
 }

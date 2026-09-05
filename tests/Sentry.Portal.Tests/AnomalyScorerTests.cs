@@ -24,7 +24,7 @@ public class AnomalyScorerTests
     [Fact]
     public void ScoreByAsset_FlagsSpikeToday()
     {
-        var now = new DateTimeOffset(2026, 9, 5, 15, 0, 0, TimeSpan.Zero);
+        var now = new DateTime(2026, 9, 5, 15, 0, 0, DateTimeKind.Utc);
         var events = new List<AlarmEvent>();
         for (var d = 14; d >= 1; d--)
         {

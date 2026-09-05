@@ -47,7 +47,7 @@ else
     private int _today;
     private double? _lowest;
     private int _lowBattery;
-    private DateTimeOffset? _heartbeat;
+    private DateTime? _heartbeat;
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,7 +57,7 @@ else
         }
 
         var id = Tenant.Current.Id;
-        var start = DateTimeOffset.UtcNow.Date;
+        var start = DateTime.UtcNow.Date;
         _active = await Alarms.ForTenant(id).CountAsync(e => e.State == AlarmState.Active);
         _today = await Alarms.ForTenant(id).CountAsync(e => e.StartedAt >= start);
         var batteries = await Alarms.LatestBatteryAsync(id);

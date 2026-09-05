@@ -50,8 +50,8 @@ public sealed class IngestService(SentryDbContext db, SmsAlertService sms)
                     Details = item.Details,
                     Severity = item.Severity,
                     State = state,
-                    StartedAt = item.StartedAt == default ? DateTimeOffset.UtcNow : item.StartedAt,
-                    EndedAt = item.EndedAt,
+                    StartedAt = Utc(item.StartedAt),
+                    EndedAt = item.EndedAt?.UtcDateTime,
                     PayloadJson = item.PayloadJson
                 });
                 accepted++;
@@ -66,7 +66,7 @@ public sealed class IngestService(SentryDbContext db, SmsAlertService sms)
                 existing.Details = item.Details;
                 existing.Severity = item.Severity;
                 existing.State = state;
-                existing.EndedAt = item.EndedAt ?? (state == AlarmState.Active ? existing.EndedAt : DateTimeOffset.UtcNow);
+                existing.EndedAt = item.EndedAt.HasValue ? item.EndedAt.Value.UtcDateTime : (state == AlarmState.Active ? existing.EndedAt : DateTime.UtcNow);
                 existing.PayloadJson = item.PayloadJson ?? existing.PayloadJson;
                 updated++;
             }
@@ -94,7 +94,7 @@ public sealed class IngestService(SentryDbContext db, SmsAlertService sms)
                 AssetLabel = item.AssetLabel.Trim(),
                 BatteryPercent = item.BatteryPercent,
                 Status = item.Status,
-                RecordedAt = item.RecordedAt == default ? DateTimeOffset.UtcNow : item.RecordedAt,
+                RecordedAt = Utc(item.RecordedAt),
                 PayloadJson = item.PayloadJson
             });
             accepted++;
@@ -107,9 +107,12 @@ public sealed class IngestService(SentryDbContext db, SmsAlertService sms)
 
     public async Task HeartbeatAsync(Site site, CancellationToken cancellationToken = default)
     {
-        site.LastHeartbeatAt = DateTimeOffset.UtcNow;
+        site.LastHeartbeatAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static DateTime Utc(DateTimeOffset value)
+        => value == default ? DateTime.UtcNow : value.UtcDateTime;
 
     private static AlarmState ParseState(string? value)
         => value?.Trim().ToLowerInvariant() switch
